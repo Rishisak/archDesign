@@ -53,7 +53,8 @@ export const useDesignStore = create(subscribeWithSelector((set, get) => ({
   windows: DEFAULT_WINDOWS,
   furniture: DEFAULT_FURNITURE,
   aiSuggestions: AI_SUGGESTIONS,
-  openDoors: new Set(),  // Set of door IDs that are open
+  openDoors: new Set(),    // Set of door IDs that are open
+  openWindows: new Set(),  // Set of window IDs that are unlocked/open
 
   viewMode: '2d',          // '2d' | '3d' | 'walkthrough' | 'vr'
   activeTool: 'select',    // 'select' | 'room' | 'door' | 'window' | 'furniture'
@@ -110,12 +111,25 @@ export const useDesignStore = create(subscribeWithSelector((set, get) => ({
   // Door / Window
   addDoor: (door) => set((s) => ({ doors: [...s.doors, { id: genId('door'), ...door }] })),
   addWindow: (win) => set((s) => ({ windows: [...s.windows, { id: genId('win'), ...win }] })),
-  deleteDoor: (id) => set((s) => ({ doors: s.doors.filter(d => d.id !== id) })),
-  deleteWindow: (id) => set((s) => ({ windows: s.windows.filter(w => w.id !== id) })),
+  updateDoor: (id, patch) => set((s) => ({ doors: s.doors.map(d => d.id === id ? { ...d, ...patch } : d) })),
+  updateWindow: (id, patch) => set((s) => ({ windows: s.windows.map(w => w.id === id ? { ...w, ...patch } : w) })),
+  deleteDoor: (id) => set((s) => ({
+    doors: s.doors.filter(d => d.id !== id),
+    selectedId: s.selectedId === id ? null : s.selectedId,
+  })),
+  deleteWindow: (id) => set((s) => ({
+    windows: s.windows.filter(w => w.id !== id),
+    selectedId: s.selectedId === id ? null : s.selectedId,
+  })),
   toggleDoor: (id) => set((s) => {
     const next = new Set(s.openDoors);
     if (next.has(id)) next.delete(id); else next.add(id);
     return { openDoors: next };
+  }),
+  toggleWindow: (id) => set((s) => {
+    const next = new Set(s.openWindows);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return { openWindows: next };
   }),
 
   // Furniture

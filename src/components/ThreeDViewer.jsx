@@ -213,46 +213,194 @@ function RoomContents({ room, cx, cz, rw, rd }) {
   );
 }
 
-// ── Window mesh (transparent glass + frame) ───────────────────
-function WindowMesh({ pos, size, isHorizontal }) {
+// ── Window mesh (transparent glass + frame + interactive sliding sashes) ──
+function WindowMesh({ win, pos, size, isOpen, onToggle }) {
   const [fw, fh, fd] = size;
+  const slideX = isOpen ? fw * 0.35 : 0;
   return (
-    <group position={pos}>
-      {/* Frame */}
-      <mesh castShadow>
+    <group position={pos} onClick={(e) => { e.stopPropagation(); if (onToggle && win) onToggle(win.id); }}>
+      {/* Outer frame */}
+      <mesh castShadow receiveShadow>
         <boxGeometry args={[fw, fh, fd]} />
-        <meshStandardMaterial color="#9aa8b0" roughness={0.4} metalness={0.3} />
+        <meshStandardMaterial color={isOpen ? "#0284c7" : "#9aa8b0"} roughness={0.3} metalness={0.4} />
       </mesh>
-      {/* Glass */}
-      <mesh>
-        <boxGeometry args={[fw * 0.85, fh * 0.8, fd * 2]} />
+      {/* Glass Pane - Left */}
+      <mesh position={[-fw * 0.22, 0, 0]}>
+        <boxGeometry args={[fw * 0.48, fh * 0.85, fd * 0.3]} />
         <meshStandardMaterial color="#a8d0e8" roughness={0.05} metalness={0.1} transparent opacity={0.35} />
+      </mesh>
+      {/* Glass Pane - Right (Sliding) */}
+      <mesh position={[fw * 0.22 - slideX, 0, fd * 0.15]}>
+        <boxGeometry args={[fw * 0.48, fh * 0.85, fd * 0.3]} />
+        <meshStandardMaterial color={isOpen ? "#86efac" : "#a8d0e8"} roughness={0.05} metalness={0.1} transparent opacity={0.5} />
       </mesh>
     </group>
   );
 }
 
-// ── Door mesh ─────────────────────────────────────────────────
-function DoorMesh({ pos, size }) {
+// ── Door mesh (interactive swing opening) ────────────────────
+function DoorMesh({ door, pos, size, isOpen, onToggle }) {
   const [dw, dh, dd] = size;
+  const isH = door.wall === 'top' || door.wall === 'bottom';
+  const openAngle = isH ? -Math.PI / 2 : Math.PI / 2;
+  const angle = isOpen ? openAngle : 0;
+
   return (
-    <group position={pos}>
-      {/* Frame */}
-      <mesh castShadow>
-        <boxGeometry args={[dw, dh, dd]} />
-        <meshStandardMaterial color="#7a5c3a" roughness={0.65} />
+    <group position={pos} onClick={(e) => { e.stopPropagation(); if (onToggle && door) onToggle(door.id); }}>
+      {/* Door Frame */}
+      <mesh castShadow receiveShadow>
+        <boxGeometry args={[dw + 0.02, dh + 0.02, dd * 1.1]} />
+        <meshStandardMaterial color="#6b4c2a" roughness={0.7} />
       </mesh>
-      {/* Knob */}
-      <mesh position={[dw * 0.35, 0, dd * 0.8]} castShadow>
-        <sphereGeometry args={[0.04, 6, 6]} />
-        <meshStandardMaterial color="#c8a840" roughness={0.2} metalness={0.8} />
-      </mesh>
+
+      {/* Hinge Group at Corner */}
+      <group position={[-dw / 2, 0, 0]} rotation={[0, angle, 0]}>
+        {/* Door Leaf */}
+        <mesh position={[dw / 2, 0, 0]} castShadow receiveShadow>
+          <boxGeometry args={[dw * 0.96, dh * 0.96, dd * 0.7]} />
+          <meshStandardMaterial color={isOpen ? "#e8b878" : "#7a5c3a"} roughness={0.65} />
+        </mesh>
+        {/* Brass Knob */}
+        <mesh position={[dw * 0.85, 0, dd * 0.6]} castShadow>
+          <sphereGeometry args={[0.04, 8, 8]} />
+          <meshStandardMaterial color="#c8a840" roughness={0.2} metalness={0.8} />
+        </mesh>
+      </group>
     </group>
   );
+}
+
+// ── User Placed 3D Furniture Component ────────────────────────
+function Furniture3D({ item }) {
+  const { x, y, width: wPx, height: hPx, color = '#607d8b', type, rotation = 0, label } = item;
+  const w = (wPx || 100) * SC;
+  const d = (hPx || 100) * SC;
+  const posX = x * SC + w / 2;
+  const posZ = y * SC + d / 2;
+  const rotY = (rotation * Math.PI) / 180;
+
+  return (
+    <group position={[posX, 0, posZ]} rotation={[0, rotY, 0]}>
+      {renderFurnitureMesh(type, w, d, color, label)}
+    </group>
+  );
+}
+
+function renderFurnitureMesh(type, w, d, color, label) {
+  switch (type) {
+    case 'sofa':
+    case 'sofa_sectional':
+    case 'armchair':
+      const isL = type === 'sofa_sectional';
+      return (
+        <group>
+          <Box pos={[0, 0.22, 0]} size={[w, 0.44, d]} color={color} roughness={0.8} />
+          <Box pos={[0, 0.62, -d * 0.4]} size={[w, 0.55, d * 0.2]} color={color} roughness={0.8} />
+          <Box pos={[-w * 0.46, 0.48, 0]} size={[w * 0.12, 0.32, d]} color={color} roughness={0.8} />
+          <Box pos={[w * 0.46, 0.48, 0]} size={[w * 0.12, 0.32, d]} color={color} roughness={0.8} />
+          <Box pos={[-w * 0.22, 0.52, 0.02]} size={[w * 0.4, 0.18, d * 0.65]} color="#9aaebb" roughness={0.85} />
+          <Box pos={[w * 0.22, 0.52, 0.02]} size={[w * 0.4, 0.18, d * 0.65]} color="#9aaebb" roughness={0.85} />
+          {isL && (
+            <Box pos={[w * 0.3, 0.32, d * 0.35]} size={[w * 0.4, 0.38, d * 0.5]} color={color} roughness={0.8} />
+          )}
+        </group>
+      );
+
+    case 'bed_single':
+    case 'bed_double':
+    case 'bed_queen':
+    case 'bed_king':
+    case 'bed_bunk':
+    case 'bed':
+      return <Bed pos={[0, 0, 0]} size={[w, 0.5, d]} bedColor={color} />;
+
+    case 'dining_4':
+    case 'dining_6':
+    case 'table':
+      return (
+        <group>
+          <Box pos={[0, 0.74, 0]} size={[w * 0.8, 0.08, d * 0.8]} color={color} roughness={0.5} />
+          {[-w*0.35, w*0.35].map(lx =>
+            [-d*0.35, d*0.35].map(lz => (
+              <Box key={`${lx}-${lz}`} pos={[lx, 0.36, lz]} size={[0.08, 0.72, 0.08]} color="#4e342e" roughness={0.7} />
+            ))
+          )}
+          <Box pos={[-w * 0.45, 0.25, 0]} size={[0.38, 0.5, 0.38]} color="#6d4c41" />
+          <Box pos={[w * 0.45, 0.25, 0]} size={[0.38, 0.5, 0.38]} color="#6d4c41" />
+          <Box pos={[0, 0.25, -d * 0.45]} size={[0.38, 0.5, 0.38]} color="#6d4c41" />
+          <Box pos={[0, 0.25, d * 0.45]} size={[0.38, 0.5, 0.38]} color="#6d4c41" />
+        </group>
+      );
+
+    case 'desk':
+    case 'table_coffee':
+    case 'nightstand':
+      return (
+        <group>
+          <Box pos={[0, 0.38, 0]} size={[w, 0.76, d]} color={color} roughness={0.6} />
+          {type === 'desk' && (
+            <>
+              <Box pos={[0, 0.95, -d * 0.1]} size={[w * 0.4, 0.3, 0.02]} color="#111" metalness={0.8} />
+              <Box pos={[0, 0.78, d * 0.1]} size={[w * 0.4, 0.02, d * 0.3]} color="#222" />
+            </>
+          )}
+          {type === 'nightstand' && (
+            <>
+              <Box pos={[0, 0.8, 0]} size={[0.12, 0.04, 0.12]} color="#c8a840" metalness={0.8} />
+              <Box pos={[0, 0.96, 0]} size={[0.2, 0.22, 0.2]} color="#fff8dc" roughness={0.9} />
+            </>
+          )}
+        </group>
+      );
+
+    case 'wardrobe':
+      return (
+        <group>
+          <Box pos={[0, 1.0, 0]} size={[w, 2.0, d]} color={color} roughness={0.65} />
+          <Box pos={[0, 1.0, d * 0.51]} size={[0.01, 1.9, 0.01]} color="#222" />
+          <Box pos={[-0.04, 1.0, d * 0.52]} size={[0.03, 0.25, 0.03]} color="#c8a840" metalness={0.8} />
+          <Box pos={[0.04, 1.0, d * 0.52]} size={[0.03, 0.25, 0.03]} color="#c8a840" metalness={0.8} />
+        </group>
+      );
+
+    case 'shoerack':
+      return (
+        <group>
+          <Box pos={[0, 0.42, 0]} size={[w, 0.84, d]} color={color} roughness={0.7} />
+          <Box pos={[0, 0.28, 0.02]} size={[w * 0.92, 0.03, d * 0.9]} color="#8d6e63" />
+          <Box pos={[0, 0.56, 0.02]} size={[w * 0.92, 0.03, d * 0.9]} color="#8d6e63" />
+        </group>
+      );
+
+    case 'tv_unit':
+    case 'tv':
+      return (
+        <group>
+          <Box pos={[0, 0.2, 0]} size={[w, 0.4, d]} color={color} roughness={0.6} />
+          <Box pos={[0, 0.75, -d * 0.1]} size={[w * 0.85, 0.55, 0.04]} color="#0a0a0a" roughness={0.1} metalness={0.3} />
+          <Box pos={[0, 0.44, -d * 0.1]} size={[w * 0.25, 0.08, 0.15]} color="#333" metalness={0.7} />
+        </group>
+      );
+
+    case 'door_single':
+    case 'door_double':
+      return (
+        <group>
+          <Box pos={[0, 1.1, 0]} size={[w, 2.2, 0.08]} color={color} roughness={0.6} />
+          <Box pos={[w * 0.38, 1.0, 0.06]} size={[0.04, 0.1, 0.06]} color="#c8a840" metalness={0.8} />
+        </group>
+      );
+
+    case 'plant':
+      return <Plant pos={[0, 0, 0]} scale={w * 1.5} />;
+
+    default:
+      return <Box pos={[0, 0.25, 0]} size={[w, 0.5, d]} color={color} roughness={0.7} />;
+  }
 }
 
 // ── Individual room ───────────────────────────────────────────
-function Room({ room, allDoors, allWindows }) {
+function Room({ room, allDoors, allWindows, openDoors, openWindows, toggleDoor, toggleWindow }) {
   const x  = room.x * SC;
   const z  = room.y * SC;
   const rw = room.width  * SC;
@@ -278,29 +426,25 @@ function Room({ room, allDoors, allWindows }) {
         <meshStandardMaterial color="#a08060" roughness={0.6} wireframe />
       </mesh>
 
-      {/* ── Walls (4 sides, with door/window cutouts approximated) ── */}
-      {/* North wall */}
+      {/* ── Walls ── */}
       {buildWallSegments(cx, cz, rw, rd, 'north', doors, windows).map((seg, i) => (
         <mesh key={`n${i}`} position={seg.pos} castShadow receiveShadow>
           <boxGeometry args={seg.size} />
           <meshStandardMaterial color={WALL_COL} roughness={0.92} />
         </mesh>
       ))}
-      {/* South wall */}
       {buildWallSegments(cx, cz, rw, rd, 'south', doors, windows).map((seg, i) => (
         <mesh key={`s${i}`} position={seg.pos} castShadow receiveShadow>
           <boxGeometry args={seg.size} />
           <meshStandardMaterial color="#eee9e3" roughness={0.92} />
         </mesh>
       ))}
-      {/* West wall */}
       {buildWallSegments(cx, cz, rw, rd, 'west', doors, windows).map((seg, i) => (
         <mesh key={`w${i}`} position={seg.pos} castShadow receiveShadow>
           <boxGeometry args={seg.size} />
           <meshStandardMaterial color="#ede8e2" roughness={0.92} />
         </mesh>
       ))}
-      {/* East wall */}
       {buildWallSegments(cx, cz, rw, rd, 'east', doors, windows).map((seg, i) => (
         <mesh key={`e${i}`} position={seg.pos} castShadow receiveShadow>
           <boxGeometry args={seg.size} />
@@ -311,13 +455,15 @@ function Room({ room, allDoors, allWindows }) {
       {/* ── Door meshes ── */}
       {doors.map((door, i) => {
         const info = getDoorPos(x, z, rw, rd, door);
-        return <DoorMesh key={i} pos={info.pos} size={info.size} />;
+        const isOpen = openDoors.has(door.id);
+        return <DoorMesh key={door.id || i} door={door} pos={info.pos} size={info.size} isOpen={isOpen} onToggle={toggleDoor} />;
       })}
 
       {/* ── Window meshes ── */}
       {windows.map((win, i) => {
         const info = getWindowPos(x, z, rw, rd, win);
-        return <WindowMesh key={i} pos={info.pos} size={info.size} />;
+        const isOpen = openWindows.has(win.id);
+        return <WindowMesh key={win.id || i} win={win} pos={info.pos} size={info.size} isOpen={isOpen} onToggle={toggleWindow} />;
       })}
 
       {/* ── Interior warm light ── */}
@@ -332,7 +478,7 @@ function Room({ room, allDoors, allWindows }) {
         shadow-mapSize-height={512}
       />
 
-      {/* ── Furniture ── */}
+      {/* ── Room Default Furniture ── */}
       <RoomContents room={room} cx={cx} cz={cz} rw={rw} rd={rd} />
     </group>
   );
@@ -344,7 +490,6 @@ function buildWallSegments(cx, cz, rw, rd, side, doors, windows) {
   const t = WALL_T;
   const segs = [];
 
-  // For simplicity: render full walls. Cutouts are visual-only (doors/windows render on top)
   if (side === 'north') segs.push({ pos: [cx, h/2, cz - rd/2 + t/2], size: [rw, h, t] });
   if (side === 'south') segs.push({ pos: [cx, h/2, cz + rd/2 - t/2], size: [rw, h, t] });
   if (side === 'west')  segs.push({ pos: [cx - rw/2 + t/2, h/2, cz], size: [t, h, rd] });
@@ -371,7 +516,7 @@ function getDoorPos(x, z, rw, rd, door) {
 function getWindowPos(x, z, rw, rd, win) {
   const ww = win.width * SC;
   const wh = 1.1;
-  const wy = 1.1; // window height from floor
+  const wy = 1.1;
   const t  = WALL_T;
   const p  = win.position;
 
@@ -386,8 +531,9 @@ function getWindowPos(x, z, rw, rd, win) {
 
 // ── Entire scene ──────────────────────────────────────────────
 function Scene({ showRoof, timeOfDay }) {
-  const { rooms, doors, windows, activeFloor } = useDesignStore();
+  const { rooms, doors, windows, furniture, activeFloor, openDoors, toggleDoor, openWindows, toggleWindow } = useDesignStore();
   const vis = rooms.filter(r => r.floor === activeFloor);
+  const visFurn = furniture.filter(f => f.floor === activeFloor);
 
   const { center, extent } = useMemo(() => {
     if (!vis.length) return { center: [0, 0, 0], extent: 5 };
@@ -448,7 +594,16 @@ function Scene({ showRoof, timeOfDay }) {
           room={room}
           allDoors={doors}
           allWindows={windows}
+          openDoors={openDoors}
+          openWindows={openWindows}
+          toggleDoor={toggleDoor}
+          toggleWindow={toggleWindow}
         />
+      ))}
+
+      {/* ── User Placed Furniture ── */}
+      {visFurn.map(f => (
+        <Furniture3D key={f.id} item={f} />
       ))}
 
       {/* ── Roof slabs (optional, translucent when shown) ── */}

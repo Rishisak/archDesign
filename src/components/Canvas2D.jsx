@@ -39,7 +39,7 @@ export default function Canvas2D() {
     isDrawingRoom, drawStart, drawCurrent,
     startDrawing, updateDrawing, finishDrawing, cancelDrawing,
     deleteRoom, deleteFurniture, snap, addDoor, addWindow, addFurniture,
-    openDoors, toggleDoor,
+    openDoors, toggleDoor, openWindows, toggleWindow,
   } = useDesignStore();
 
   // ── Auto-fit rooms into view on first load ──────────────────
@@ -269,46 +269,56 @@ export default function Canvas2D() {
             );
           })}
 
-          {/* Doors — clickable to open/close with animated swing */}
+          {/* Doors — clickable to open/close with animated swing and selection */}
           {doors.map(door => {
             const room = rooms.find(r => r.id === door.roomId);
             if (!room || room.floor !== activeFloor) return null;
             const t      = getOpeningTransform(room, door.wall, door.position, door.width);
             const isH    = door.wall === 'top' || door.wall === 'bottom';
             const isOpen = openDoors.has(door.id);
+            const isSel  = selectedId === door.id;
             const arc    = door.width * 0.85;
 
-            // Pivot point of the door leaf (hinge corner)
-            let pivotX, pivotY, leafW, leafH;
+            // Hinge corner pivot point
+            let pivotX, pivotY;
             if (isH) {
               pivotX = t.x; pivotY = t.y + WALL_THICKNESS / 2;
-              leafW = door.width; leafH = WALL_THICKNESS;
             } else {
               pivotX = t.x + WALL_THICKNESS / 2; pivotY = t.y;
-              leafW = WALL_THICKNESS; leafH = door.width;
             }
 
-            // Open rotation: 90° swing for horizontal walls, -90° for vertical
             const openAngle = isH ? -90 : 90;
             const angle     = isOpen ? openAngle : 0;
 
             return (
               <g key={door.id}
                 style={{ cursor: activeTool === 'select' ? 'pointer' : 'default' }}
-                onClick={e => { e.stopPropagation(); if (activeTool === 'select') toggleDoor(door.id); }}
+                onClick={e => {
+                  e.stopPropagation();
+                  if (activeTool === 'select') {
+                    setSelectedId(door.id);
+                    toggleDoor(door.id);
+                  }
+                }}
               >
-                {/* Wall gap (always clear) */}
+                {/* Wall gap */}
                 <rect x={t.x} y={t.y} width={t.w} height={t.h} fill={room.color} />
 
-                {/* Door frame (static) */}
+                {/* Selection highlight */}
+                {isSel && (
+                  <rect x={t.x - 4/z} y={t.y - 4/z} width={t.w + 8/z} height={t.h + 8/z}
+                    fill="none" stroke="#4f8ef7" strokeWidth={2/z} strokeDasharray={`${3/z} ${2/z}`} rx={2} />
+                )}
+
+                {/* Door frame */}
                 <rect x={t.x} y={t.y} width={t.w} height={t.h}
                   fill="none" stroke="#7a5030" strokeWidth={1.5/z} />
 
-                {/* Door leaf — rotates around hinge with CSS transition */}
+                {/* Rotating Door Leaf */}
                 <g style={{
                   transformOrigin: `${pivotX}px ${pivotY}px`,
                   transform: `rotate(${angle}deg)`,
-                  transition: 'transform 0.45s cubic-bezier(0.4,0,0.2,1)',
+                  transition: 'transform 0.4s cubic-bezier(0.4,0,0.2,1)',
                   transformBox: 'fill-box',
                 }}>
                   <rect
@@ -316,21 +326,21 @@ export default function Canvas2D() {
                     width={isH ? door.width : WALL_THICKNESS}
                     height={isH ? WALL_THICKNESS : door.width}
                     fill={isOpen ? '#e8b878' : '#c8923a'}
-                    fillOpacity="0.88"
+                    fillOpacity="0.9"
                     stroke="#a06828"
-                    strokeWidth={0.6/z}
+                    strokeWidth={0.8/z}
                     rx={1/z}
                   />
-                  {/* Door knob */}
+                  {/* Knob */}
                   <circle
-                    cx={isH ? t.x + door.width * 0.78 : t.x + WALL_THICKNESS / 2}
-                    cy={isH ? t.y + WALL_THICKNESS / 2 : t.y + door.width * 0.78}
-                    r={3/z}
-                    fill="#c8a840" stroke="#a08020" strokeWidth={0.4/z}
+                    cx={isH ? t.x + door.width * 0.8 : t.x + WALL_THICKNESS / 2}
+                    cy={isH ? t.y + WALL_THICKNESS / 2 : t.y + door.width * 0.8}
+                    r={3.5/z}
+                    fill="#c8a840" stroke="#806010" strokeWidth={0.5/z}
                   />
                 </g>
 
-                {/* Swing arc (shown when closed) */}
+                {/* Swing arc */}
                 {!isOpen && (
                   <path
                     d={isH
@@ -338,19 +348,19 @@ export default function Canvas2D() {
                       : `M${t.x+WALL_THICKNESS/2} ${t.y} A${arc} ${arc} 0 0 0 ${t.x+WALL_THICKNESS/2+arc} ${t.y}`
                     }
                     fill="rgba(200,146,58,0.08)"
-                    stroke="#a06828" strokeWidth={0.5/z}
+                    stroke="#a06828" strokeWidth={0.6/z}
                     strokeDasharray={`${2.5/z} ${2/z}`}
                     pointerEvents="none"
                   />
                 )}
 
-                {/* Open/close indicator on hover */}
+                {/* Status Indicator */}
                 <text
                   x={isH ? t.x + door.width/2 : t.x + WALL_THICKNESS/2}
                   y={isH ? t.y - 6/z : t.y - 6/z}
                   textAnchor="middle"
-                  fill={isOpen ? '#4fa86f' : '#c8923a'}
-                  fontSize={Math.max(4, 7/z)}
+                  fill={isOpen ? '#16a34a' : '#c8923a'}
+                  fontSize={Math.max(5, 8/z)}
                   fontFamily="Inter" fontWeight="700"
                   pointerEvents="none"
                 >
@@ -360,41 +370,86 @@ export default function Canvas2D() {
             );
           })}
 
-          {/* Windows */}
-          {windows.map((win, idx) => {
+          {/* Windows — clickable to unlock/open with sliding sashes */}
+          {windows.map((win) => {
             const room = rooms.find(r => r.id === win.roomId);
             if (!room || room.floor !== activeFloor) return null;
-            const t   = getOpeningTransform(room, win.wall, win.position, win.width);
-            const isH = win.wall === 'top' || win.wall === 'bottom';
-            return (
-              <g key={`w-${idx}-${win.id}`} pointerEvents="none">
-                <rect x={t.x} y={t.y} width={t.w} height={t.h} fill={room.color} />
-                <rect x={t.x} y={t.y} width={t.w} height={t.h}
-                  fill="#a8d8f0" fillOpacity="0.6" stroke="#5ab0e0" strokeWidth={1.2/z} />
-                {isH
-                  ? <line x1={t.x+win.width/2} y1={t.y} x2={t.x+win.width/2} y2={t.y+WALL_THICKNESS} stroke="#5ab0e0" strokeWidth={0.7/z} />
-                  : <line x1={t.x} y1={t.y+win.width/2} x2={t.x+WALL_THICKNESS} y2={t.y+win.width/2} stroke="#5ab0e0" strokeWidth={0.7/z} />
-                }
-              </g>
-            );
-          })}
+            const t      = getOpeningTransform(room, win.wall, win.position, win.width);
+            const isH    = win.wall === 'top' || win.wall === 'bottom';
+            const isOpen = openWindows.has(win.id);
+            const isSel  = selectedId === win.id;
 
-          {/* Furniture */}
-          {visibleFurn.map(f => {
-            const sel = selectedId === f.id;
             return (
-              <g key={f.id} onClick={e => { e.stopPropagation(); if (activeTool==='select') setSelectedId(f.id); }}
-                style={{ cursor: activeTool === 'select' ? 'pointer' : 'default' }}>
-                <rect x={f.x} y={f.y} width={f.width} height={f.height}
-                  fill={f.color} fillOpacity="0.85" rx={4/z}
-                  stroke={sel ? '#4f8ef7' : 'rgba(0,0,0,0.2)'} strokeWidth={sel ? 2/z : 0.8/z} />
-                <text x={f.x+f.width/2} y={f.y+f.height/2+4} textAnchor="middle"
-                  fill="rgba(0,0,0,0.5)" fontSize={Math.max(6,9/z)} fontFamily="Inter" pointerEvents="none">
-                  {f.label}
+              <g key={`w-${win.id}`}
+                style={{ cursor: activeTool === 'select' ? 'pointer' : 'default' }}
+                onClick={e => {
+                  e.stopPropagation();
+                  if (activeTool === 'select') {
+                    setSelectedId(win.id);
+                    toggleWindow(win.id);
+                  }
+                }}
+              >
+                {/* Wall gap */}
+                <rect x={t.x} y={t.y} width={t.w} height={t.h} fill={room.color} />
+
+                {/* Selection highlight */}
+                {isSel && (
+                  <rect x={t.x - 4/z} y={t.y - 4/z} width={t.w + 8/z} height={t.h + 8/z}
+                    fill="none" stroke="#4f8ef7" strokeWidth={2/z} strokeDasharray={`${3/z} ${2/z}`} rx={2} />
+                )}
+
+                {/* Window glass pane & frame */}
+                <rect x={t.x} y={t.y} width={t.w} height={t.h}
+                  fill={isOpen ? 'rgba(74, 222, 128, 0.35)' : 'rgba(168, 216, 240, 0.65)'}
+                  stroke={isOpen ? '#16a34a' : '#5ab0e0'}
+                  strokeWidth={1.2/z} rx={1/z}
+                />
+
+                {/* Pane division lines */}
+                {isH ? (
+                  <>
+                    <line x1={t.x + (isOpen ? win.width * 0.25 : win.width / 2)} y1={t.y}
+                      x2={t.x + (isOpen ? win.width * 0.25 : win.width / 2)} y2={t.y + WALL_THICKNESS} stroke="#5ab0e0" strokeWidth={1/z} />
+                    {isOpen && <line x1={t.x + win.width * 0.75} y1={t.y} x2={t.x + win.width * 0.75} y2={t.y + WALL_THICKNESS} stroke="#16a34a" strokeWidth={1/z} strokeDasharray={`${2/z} ${1/z}`} />}
+                  </>
+                ) : (
+                  <>
+                    <line x1={t.x} y1={t.y + (isOpen ? win.width * 0.25 : win.width / 2)}
+                      x2={t.x + WALL_THICKNESS} y2={t.y + (isOpen ? win.width * 0.25 : win.width / 2)} stroke="#5ab0e0" strokeWidth={1/z} />
+                    {isOpen && <line x1={t.x} y1={t.y + win.width * 0.75} x2={t.x + WALL_THICKNESS} y2={t.y + win.width * 0.75} stroke="#16a34a" strokeWidth={1/z} strokeDasharray={`${2/z} ${1/z}`} />}
+                  </>
+                )}
+
+                {/* Window status badge */}
+                <text
+                  x={isH ? t.x + win.width/2 : t.x + WALL_THICKNESS/2}
+                  y={isH ? t.y - 6/z : t.y - 6/z}
+                  textAnchor="middle"
+                  fill={isOpen ? '#16a34a' : '#0284c7'}
+                  fontSize={Math.max(5, 8/z)}
+                  fontFamily="Inter" fontWeight="700"
+                  pointerEvents="none"
+                >
+                  {isOpen ? '🔓 UNLOCKED' : '🔒 LOCKED'}
                 </text>
               </g>
             );
           })}
+
+          {/* Furniture — Detailed 2D IKEA models */}
+          {visibleFurn.map(f => (
+            <Furniture2D
+              key={f.id}
+              item={f}
+              selected={selectedId === f.id}
+              z={z}
+              onClick={e => {
+                e.stopPropagation();
+                if (activeTool === 'select') setSelectedId(f.id);
+              }}
+            />
+          ))}
 
           {/* Draw preview */}
           {preview && preview.width > 5 && preview.height > 5 && (
@@ -491,5 +546,190 @@ function ToolHint({ children }) {
     }}>
       {children}
     </div>
+  );
+}
+
+function Furniture2D({ item, selected, z, onClick }) {
+  const { x, y, width: w, height: h, color, label, type, rotation = 0 } = item;
+  const rot = rotation || 0;
+  const cx  = x + w / 2;
+  const cy  = y + h / 2;
+
+  const renderDetails = () => {
+    switch (type) {
+      case 'sofa':
+        return (
+          <>
+            <rect x={x} y={y} width={w} height={h} fill={color} rx={6/z} stroke="rgba(0,0,0,0.3)" strokeWidth={1/z} />
+            <rect x={x+2} y={y+2} width={w-4} height={h*0.3} fill="rgba(0,0,0,0.15)" rx={3/z} />
+            <rect x={x+2} y={y+2} width={w*0.15} height={h-4} fill="rgba(0,0,0,0.12)" rx={3/z} />
+            <rect x={x+w-w*0.15-2} y={y+2} width={w*0.15} height={h-4} fill="rgba(0,0,0,0.12)" rx={3/z} />
+            <rect x={x+w*0.18} y={y+h*0.32} width={(w*0.64)/2-2} height={h*0.6} fill="rgba(255,255,255,0.2)" rx={3/z} />
+            <rect x={x+w*0.18+(w*0.64)/2+1} y={y+h*0.32} width={(w*0.64)/2-2} height={h*0.6} fill="rgba(255,255,255,0.2)" rx={3/z} />
+          </>
+        );
+
+      case 'sofa_sectional':
+        return (
+          <>
+            <rect x={x} y={y} width={w} height={h} fill={color} rx={6/z} stroke="rgba(0,0,0,0.3)" strokeWidth={1/z} />
+            <rect x={x+2} y={y+2} width={w-4} height={h*0.25} fill="rgba(0,0,0,0.15)" rx={3/z} />
+            <rect x={x+w*0.65} y={y+2} width={w*0.32} height={h-4} fill="rgba(0,0,0,0.15)" rx={3/z} />
+            <rect x={x+2} y={y+2} width={w*0.12} height={h*0.75} fill="rgba(0,0,0,0.12)" rx={2/z} />
+          </>
+        );
+
+      case 'armchair':
+        return (
+          <>
+            <rect x={x} y={y} width={w} height={h} fill={color} rx={6/z} stroke="rgba(0,0,0,0.3)" strokeWidth={1/z} />
+            <rect x={x+3} y={y+3} width={w-6} height={h*0.3} fill="rgba(0,0,0,0.15)" rx={3/z} />
+            <rect x={x+3} y={y+3} width={w*0.2} height={h-6} fill="rgba(0,0,0,0.12)" rx={3/z} />
+            <rect x={x+w-w*0.2-3} y={y+3} width={w*0.2} height={h-6} fill="rgba(0,0,0,0.12)" rx={3/z} />
+            <rect x={x+w*0.22} y={y+h*0.33} width={w*0.56} height={h*0.6} fill="rgba(255,255,255,0.25)" rx={4/z} />
+          </>
+        );
+
+      case 'bed_single':
+      case 'bed_double':
+      case 'bed_queen':
+      case 'bed_king':
+      case 'bed_bunk':
+      case 'bed':
+        const isKingQueen = type === 'bed_queen' || type === 'bed_king' || type === 'bed_double';
+        return (
+          <>
+            <rect x={x} y={y} width={w} height={h} fill={color} rx={5/z} stroke="rgba(0,0,0,0.3)" strokeWidth={1/z} />
+            <rect x={x+2} y={y+2} width={w-4} height={h*0.12} fill="rgba(0,0,0,0.25)" rx={2/z} />
+            <rect x={x+4} y={y+h*0.14} width={w-8} height={h*0.82} fill="rgba(255,255,255,0.85)" rx={3/z} />
+            {isKingQueen ? (
+              <>
+                <rect x={x+w*0.1} y={y+h*0.18} width={w*0.36} height={h*0.18} fill="#f5f5f5" stroke="#ccc" strokeWidth={0.5/z} rx={3/z} />
+                <rect x={x+w*0.54} y={y+h*0.18} width={w*0.36} height={h*0.18} fill="#f5f5f5" stroke="#ccc" strokeWidth={0.5/z} rx={3/z} />
+              </>
+            ) : (
+              <rect x={x+w*0.2} y={y+h*0.18} width={w*0.6} height={h*0.18} fill="#f5f5f5" stroke="#ccc" strokeWidth={0.5/z} rx={3/z} />
+            )}
+            <rect x={x+4} y={y+h*0.42} width={w-8} height={h*0.54} fill={color} fillOpacity="0.6" rx={2/z} />
+            <line x1={x+4} y1={y+h*0.42} x2={x+w-4} y2={y+h*0.42} stroke="rgba(0,0,0,0.2)" strokeWidth={1.5/z} />
+            {type === 'bed_bunk' && (
+              <text x={x+w/2} y={y+h*0.75} textAnchor="middle" fill="#fff" fontSize={Math.max(6, 8/z)} fontWeight="bold">BUNK</text>
+            )}
+          </>
+        );
+
+      case 'dining_4':
+      case 'dining_6':
+      case 'table':
+        const chairCount = type === 'dining_6' ? 6 : 4;
+        return (
+          <>
+            <rect x={x+w*0.15} y={y+h*0.15} width={w*0.7} height={h*0.7} fill={color} rx={4/z} stroke="rgba(0,0,0,0.3)" strokeWidth={1/z} />
+            <rect x={x+w*0.25} y={y} width={w*0.2} height={h*0.12} fill="#5d4037" rx={2/z} />
+            <rect x={x+w*0.55} y={y} width={w*0.2} height={h*0.12} fill="#5d4037" rx={2/z} />
+            <rect x={x+w*0.25} y={y+h*0.88} width={w*0.2} height={h*0.12} fill="#5d4037" rx={2/z} />
+            <rect x={x+w*0.55} y={y+h*0.88} width={w*0.2} height={h*0.12} fill="#5d4037" rx={2/z} />
+            {chairCount === 6 && (
+              <>
+                <rect x={x} y={y+h*0.35} width={w*0.12} height={h*0.3} fill="#5d4037" rx={2/z} />
+                <rect x={x+w*0.88} y={y+h*0.35} width={w*0.88} height={h*0.3} fill="#5d4037" rx={2/z} />
+              </>
+            )}
+          </>
+        );
+
+      case 'table_coffee':
+      case 'desk':
+      case 'nightstand':
+        return (
+          <>
+            <rect x={x} y={y} width={w} height={h} fill={color} rx={4/z} stroke="rgba(0,0,0,0.3)" strokeWidth={1/z} />
+            <rect x={x+3} y={y+3} width={w-6} height={h-6} fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth={1/z} rx={2/z} />
+            {type === 'desk' && (
+              <>
+                <rect x={x+w*0.3} y={y+h*0.2} width={w*0.4} height={h*0.3} fill="#333" rx={1/z} />
+                <rect x={x+w*0.72} y={y+4} width={w*0.24} height={h-8} fill="rgba(0,0,0,0.15)" rx={2/z} />
+              </>
+            )}
+            {type === 'nightstand' && (
+              <circle cx={x+w/2} cy={y+h/2} r={3/z} fill="rgba(0,0,0,0.3)" />
+            )}
+          </>
+        );
+
+      case 'wardrobe':
+        return (
+          <>
+            <rect x={x} y={y} width={w} height={h} fill={color} rx={2/z} stroke="rgba(0,0,0,0.4)" strokeWidth={1/z} />
+            <line x1={x+w/2} y1={y+2} x2={x+w/2} y2={y+h-2} stroke="rgba(0,0,0,0.3)" strokeWidth={1/z} />
+            <rect x={x+w*0.45} y={y+h*0.4} width={w*0.03} height={h*0.2} fill="#c8a840" />
+            <rect x={x+w*0.52} y={y+h*0.4} width={w*0.03} height={h*0.2} fill="#c8a840" />
+          </>
+        );
+
+      case 'shoerack':
+        return (
+          <>
+            <rect x={x} y={y} width={w} height={h} fill={color} rx={2/z} stroke="rgba(0,0,0,0.4)" strokeWidth={1/z} />
+            {[0.25, 0.5, 0.75].map((p, i) => (
+              <line key={i} x1={x+4} y1={y+h*p} x2={x+w-4} y2={y+h*p} stroke="rgba(255,255,255,0.25)" strokeWidth={1/z} />
+            ))}
+          </>
+        );
+
+      case 'tv_unit':
+      case 'tv':
+        return (
+          <>
+            <rect x={x} y={y} width={w} height={h} fill={color} rx={3/z} stroke="rgba(0,0,0,0.4)" strokeWidth={1/z} />
+            <rect x={x+w*0.1} y={y+h*0.35} width={w*0.8} height={h*0.3} fill="#000" rx={1/z} stroke="#444" strokeWidth={0.5/z} />
+          </>
+        );
+
+      case 'door_single':
+      case 'door_double':
+        const isDouble = type === 'door_double';
+        return (
+          <>
+            <rect x={x} y={y} width={w} height={h} fill={color} fillOpacity="0.3" stroke={color} strokeWidth={1.5/z} rx={2/z} />
+            {isDouble ? (
+              <>
+                <path d={`M ${x} ${y+h} A ${w/2} ${w/2} 0 0 1 ${x+w/2} ${y+h-w/2}`} fill="none" stroke={color} strokeDasharray={`${3/z} ${2/z}`} strokeWidth={1/z} />
+                <path d={`M ${x+w} ${y+h} A ${w/2} ${w/2} 0 0 0 ${x+w/2} ${y+h-w/2}`} fill="none" stroke={color} strokeDasharray={`${3/z} ${2/z}`} strokeWidth={1/z} />
+              </>
+            ) : (
+              <path d={`M ${x} ${y+h} A ${w} ${w} 0 0 1 ${x+w} ${y+h-w}`} fill="none" stroke={color} strokeDasharray={`${3/z} ${2/z}`} strokeWidth={1/z} />
+            )}
+          </>
+        );
+
+      default:
+        return (
+          <rect x={x} y={y} width={w} height={h} fill={color} rx={4/z} stroke="rgba(0,0,0,0.3)" strokeWidth={1/z} />
+        );
+    }
+  };
+
+  return (
+    <g
+      onClick={onClick}
+      style={{ cursor: 'pointer' }}
+      transform={rot ? `rotate(${rot}, ${cx}, ${cy})` : undefined}
+    >
+      {selected && (
+        <rect
+          x={x-4/z} y={y-4/z} width={w+8/z} height={h+8/z}
+          fill="none" stroke="#4f8ef7" strokeWidth={2/z} strokeDasharray={`${4/z} ${2/z}`} rx={6/z}
+        />
+      )}
+      {renderDetails()}
+      <text
+        x={cx} y={cy+3}
+        textAnchor="middle" fill="#000" fillOpacity="0.75"
+        fontSize={Math.max(6, 9/z)} fontWeight="600" fontFamily="Inter, sans-serif" pointerEvents="none"
+      >
+        {label}
+      </text>
+    </g>
   );
 }

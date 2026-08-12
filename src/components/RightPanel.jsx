@@ -9,18 +9,38 @@ const ROOM_COLORS = [
 const ROOM_TYPES = ['living','bedroom','kitchen','bathroom','dining','hallway','study','gym','cinema','other'];
 
 const LIBRARY_ITEMS = [
-  { icon: '🛋️', name: 'Sofa',        type: 'sofa',    w: 160, h: 70,  color: '#b4c4d4' },
-  { icon: '🛏️', name: 'Queen Bed',   type: 'bed',     w: 150, h: 190, color: '#c4a0d4' },
-  { icon: '🛏️', name: 'Twin Bed',    type: 'bed',     w: 110, h: 160, color: '#a0c4d4' },
-  { icon: '🚿', name: 'Bathtub',     type: 'bath',    w: 70,  h: 130, color: '#a8d4f0' },
-  { icon: '🪑', name: 'Chair',       type: 'chair',   w: 60,  h: 60,  color: '#d4c4a0' },
-  { icon: '🍽️', name: 'Dining Table',type: 'table',   w: 120, h: 80,  color: '#d4b483' },
-  { icon: '📺', name: 'TV Console',  type: 'tv',      w: 130, h: 25,  color: '#333'    },
-  { icon: '🪞', name: 'Wardrobe',    type: 'wardrobe',w: 180, h: 50,  color: '#8b6c52' },
-  { icon: '🖥️', name: 'Desk',        type: 'desk',    w: 120, h: 60,  color: '#a0b4c8' },
-  { icon: '🌿', name: 'Plant',       type: 'plant',   w: 35,  h: 35,  color: '#5a9a5a' },
-  { icon: '🛁', name: 'Shower',      type: 'shower',  w: 80,  h: 80,  color: '#c0ddf0' },
-  { icon: '🍳', name: 'Kitchen Isle',type: 'island',  w: 120, h: 70,  color: '#d4cfc0' },
+  // ── Doors & Openings ──
+  { category: 'doors', icon: '🚪', name: 'Single Door',       type: 'door_single',    w: 80,  h: 20, color: '#c8923a' },
+  { category: 'doors', icon: '🚪', name: 'Double Door',       type: 'door_double',    w: 140, h: 20, color: '#c8923a' },
+
+  // ── Seating ──
+  { category: 'seating', icon: '🛋️', name: '3-Seater Sofa',   type: 'sofa',           w: 180, h: 80, color: '#546e7a' },
+  { category: 'seating', icon: '🛋️', name: 'Sectional L-Sofa',type: 'sofa_sectional', w: 200, h: 160,color: '#37474f' },
+  { category: 'seating', icon: '🪑', name: 'Armchair',        type: 'armchair',       w: 80,  h: 80, color: '#78909c' },
+
+  // ── Beds ──
+  { category: 'beds', icon: '🛏️', name: 'Single Bed',        type: 'bed_single',     w: 100, h: 190, color: '#8e24aa' },
+  { category: 'beds', icon: '🛏️', name: 'Double Bed',        type: 'bed_double',     w: 140, h: 190, color: '#ab47bc' },
+  { category: 'beds', icon: '🛏️', name: 'Queen Bed',         type: 'bed_queen',      w: 160, h: 200, color: '#7b1fa2' },
+  { category: 'beds', icon: '🛏️', name: 'King Bed',          type: 'bed_king',       w: 190, h: 200, color: '#673ab7' },
+  { category: 'beds', icon: '🛏️', name: 'Bunk Bed',          type: 'bed_bunk',       w: 100, h: 190, color: '#512da8' },
+
+  // ── Tables & Desks ──
+  { category: 'tables', icon: '🍽️', name: 'Dining Table (4-Seat)', type: 'dining_4', w: 120, h: 80, color: '#8d6e63' },
+  { category: 'tables', icon: '🍽️', name: 'Dining Table (6-Seat)', type: 'dining_6', w: 170, h: 90, color: '#6d4c41' },
+  { category: 'tables', icon: '☕', name: 'Coffee Table',     type: 'table_coffee',   w: 100, h: 50, color: '#a1887f' },
+  { category: 'tables', icon: '🖥️', name: 'Office Desk',      type: 'desk',           w: 130, h: 65, color: '#5d4037' },
+  { category: 'tables', icon: '🛏️', name: 'Bedside Table',    type: 'nightstand',     w: 45,  h: 45, color: '#bcaaa4' },
+
+  // ── Storage & Appliances ──
+  { category: 'storage', icon: '🪞', name: 'Wardrobe',       type: 'wardrobe',       w: 160, h: 60, color: '#4e342e' },
+  { category: 'storage', icon: '👟', name: 'Shoe Rack',      type: 'shoerack',       w: 90,  h: 35, color: '#3e2723' },
+  { category: 'storage', icon: '📺', name: 'TV Unit & Console', type: 'tv_unit',     w: 150, h: 40, color: '#212121' },
+
+  // ── Bath & Decor ──
+  { category: 'decor', icon: '🛁', name: 'Bathtub',          type: 'bath',           w: 80,  h: 150, color: '#0288d1' },
+  { category: 'decor', icon: '🚿', name: 'Shower Cabinet',   type: 'shower',         w: 90,  h: 90, color: '#03a9f4' },
+  { category: 'decor', icon: '🌿', name: 'Plant',           type: 'plant',          w: 40,  h: 40, color: '#2e7d32' },
 ];
 
 const THEMES = [
@@ -109,12 +129,91 @@ function AIPanel() {
 }
 
 function RoomsPanel() {
-  const { rooms, selectedId, setSelectedId, updateRoom, deleteRoom, activeFloor } = useDesignStore();
+  const {
+    rooms, doors, windows, furniture, selectedId, setSelectedId,
+    updateRoom, deleteRoom, updateFurniture, deleteFurniture,
+    updateDoor, deleteDoor, updateWindow, deleteWindow,
+    openDoors, toggleDoor, openWindows, toggleWindow, activeFloor
+  } = useDesignStore();
   const vis = rooms.filter(r => r.floor === activeFloor);
-  const sel = vis.find(r => r.id === selectedId);
+  const selRoom = vis.find(r => r.id === selectedId);
+  const selFurn = furniture.find(f => f.id === selectedId);
+  const selDoor = doors.find(d => d.id === selectedId);
+  const selWin  = windows.find(w => w.id === selectedId);
 
   return (
     <div>
+      {/* Inspector for selected item */}
+      {selDoor && (
+        <div style={{ marginBottom: 12, padding: 12, background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--accent)' }}>
+          <div className="section-header">🚪 Selected Door</div>
+          <div className="prop-group">
+            <div className="prop-label">Status</div>
+            <button className={`btn ${openDoors.has(selDoor.id) ? 'btn-success' : 'btn-primary'}`} style={{ width: '100%' }}
+              onClick={() => toggleDoor(selDoor.id)}>
+              {openDoors.has(selDoor.id) ? '▲ Open (Click to Close)' : '▼ Closed (Click to Open)'}
+            </button>
+          </div>
+          <div className="prop-group">
+            <div className="prop-label">Width (cm)</div>
+            <input className="prop-input" type="number" value={selDoor.width}
+              onChange={e => updateDoor(selDoor.id, { width: +e.target.value })} />
+          </div>
+          <button className="btn btn-danger w-full" style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}
+            onClick={() => deleteDoor(selDoor.id)}>🗑 Delete Door</button>
+        </div>
+      )}
+
+      {selWin && (
+        <div style={{ marginBottom: 12, padding: 12, background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--accent)' }}>
+          <div className="section-header">🪟 Selected Window</div>
+          <div className="prop-group">
+            <div className="prop-label">Status</div>
+            <button className={`btn ${openWindows.has(selWin.id) ? 'btn-success' : 'btn-primary'}`} style={{ width: '100%' }}
+              onClick={() => toggleWindow(selWin.id)}>
+              {openWindows.has(selWin.id) ? '🔓 Unlocked & Open (Click to Lock)' : '🔒 Locked (Click to Unlock & Open)'}
+            </button>
+          </div>
+          <div className="prop-group">
+            <div className="prop-label">Width (cm)</div>
+            <input className="prop-input" type="number" value={selWin.width}
+              onChange={e => updateWindow(selWin.id, { width: +e.target.value })} />
+          </div>
+          <button className="btn btn-danger w-full" style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}
+            onClick={() => deleteWindow(selWin.id)}>🗑 Delete Window</button>
+        </div>
+      )}
+
+      {selFurn && (
+        <div style={{ marginBottom: 12, padding: 12, background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--accent)' }}>
+          <div className="section-header">🛋️ Selected Item: {selFurn.label}</div>
+          <div className="prop-group">
+            <div className="prop-label">Label / Name</div>
+            <input className="prop-input" value={selFurn.label}
+              onChange={e => updateFurniture(selFurn.id, { label: e.target.value })} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div className="prop-group">
+              <div className="prop-label">Width (cm)</div>
+              <input className="prop-input" type="number" value={selFurn.width}
+                onChange={e => updateFurniture(selFurn.id, { width: +e.target.value })} />
+            </div>
+            <div className="prop-group">
+              <div className="prop-label">Depth/Height (cm)</div>
+              <input className="prop-input" type="number" value={selFurn.height}
+                onChange={e => updateFurniture(selFurn.id, { height: +e.target.value })} />
+            </div>
+          </div>
+          <div className="prop-group">
+            <div className="prop-label">Rotation (°)</div>
+            <input className="prop-input" type="number" value={selFurn.rotation || 0} step="15"
+              onChange={e => updateFurniture(selFurn.id, { rotation: +e.target.value })} />
+          </div>
+          <button className="btn btn-danger w-full" style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}
+            onClick={() => deleteFurniture(selFurn.id)}>🗑 Delete Item</button>
+        </div>
+      )}
+
       <div className="section-header">Rooms on This Floor ({vis.length})</div>
       {vis.map(r => (
         <div key={r.id} className={`room-card ${selectedId === r.id ? 'selected' : ''}`}
@@ -133,18 +232,18 @@ function RoomsPanel() {
         </div>
       ))}
 
-      {sel && (
+      {selRoom && (
         <div style={{ marginTop: 12, padding: 12, background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
           <div className="section-header">Edit Room</div>
           <div className="prop-group">
             <div className="prop-label">Name</div>
-            <input className="prop-input" value={sel.name}
-              onChange={e => updateRoom(sel.id, { name: e.target.value })} />
+            <input className="prop-input" value={selRoom.name}
+              onChange={e => updateRoom(selRoom.id, { name: e.target.value })} />
           </div>
           <div className="prop-group">
             <div className="prop-label">Type</div>
-            <select className="prop-input" value={sel.type ?? 'room'}
-              onChange={e => updateRoom(sel.id, { type: e.target.value })}>
+            <select className="prop-input" value={selRoom.type ?? 'room'}
+              onChange={e => updateRoom(selRoom.id, { type: e.target.value })}>
               {ROOM_TYPES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
             </select>
           </div>
@@ -152,25 +251,25 @@ function RoomsPanel() {
             <div className="prop-label">Fill Color</div>
             <div className="color-row">
               {ROOM_COLORS.map(c => (
-                <div key={c} className={`color-swatch ${sel.color === c ? 'selected' : ''}`}
-                  style={{ background: c }} onClick={() => updateRoom(sel.id, { color: c })} />
+                <div key={c} className={`color-swatch ${selRoom.color === c ? 'selected' : ''}`}
+                  style={{ background: c }} onClick={() => updateRoom(selRoom.id, { color: c })} />
               ))}
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div className="prop-group">
               <div className="prop-label">Width (cm)</div>
-              <input className="prop-input" type="number" value={sel.width}
-                onChange={e => updateRoom(sel.id, { width: +e.target.value })} />
+              <input className="prop-input" type="number" value={selRoom.width}
+                onChange={e => updateRoom(selRoom.id, { width: +e.target.value })} />
             </div>
             <div className="prop-group">
               <div className="prop-label">Height (cm)</div>
-              <input className="prop-input" type="number" value={sel.height}
-                onChange={e => updateRoom(sel.id, { height: +e.target.value })} />
+              <input className="prop-input" type="number" value={selRoom.height}
+                onChange={e => updateRoom(selRoom.id, { height: +e.target.value })} />
             </div>
           </div>
           <button className="btn btn-danger w-full" style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}
-            onClick={() => deleteRoom(sel.id)}>🗑 Delete Room</button>
+            onClick={() => deleteRoom(selRoom.id)}>🗑 Delete Room</button>
         </div>
       )}
 
@@ -187,34 +286,69 @@ function RoomsPanel() {
 function LibraryPanel() {
   const { addFurniture, activeFloor, rooms } = useDesignStore();
   const [search, setSearch] = useState('');
+  const [catFilter, setCatFilter] = useState('all');
 
-  const filtered = LIBRARY_ITEMS.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = LIBRARY_ITEMS.filter(i => {
+    const matchSearch = i.name.toLowerCase().includes(search.toLowerCase());
+    const matchCat    = catFilter === 'all' || i.category === catFilter;
+    return matchSearch && matchCat;
+  });
 
   const place = (item) => {
     const r = rooms.find(rm => rm.floor === activeFloor);
     addFurniture({
       roomId: r?.id ?? null,
       type: item.type,
-      x: (r ? r.x + 20 : 100),
-      y: (r ? r.y + 20 : 100),
+      x: (r ? r.x + 30 : 100),
+      y: (r ? r.y + 30 : 100),
       width: item.w,
       height: item.h,
       color: item.color,
       label: item.name,
+      rotation: 0,
     });
   };
 
+  const categories = [
+    { id: 'all', label: 'All' },
+    { id: 'doors', label: 'Doors' },
+    { id: 'seating', label: 'Seating' },
+    { id: 'beds', label: 'Beds' },
+    { id: 'tables', label: 'Tables' },
+    { id: 'storage', label: 'Storage' },
+    { id: 'decor', label: 'Bath/Decor' },
+  ];
+
   return (
     <div>
-      <div className="section-header">3D Asset Library</div>
+      <div className="section-header">IKEA Furniture & Asset Library</div>
       <input
         className="prop-input" placeholder="🔍 Search furniture..."
         value={search} onChange={e => setSearch(e.target.value)}
-        style={{ marginBottom: 10 }}
+        style={{ marginBottom: 8 }}
       />
+
+      {/* Category Pills */}
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 12 }}>
+        {categories.map(c => (
+          <button
+            key={c.id}
+            onClick={() => setCatFilter(c.id)}
+            style={{
+              padding: '3px 8px', fontSize: 11, borderRadius: 99, border: '1px solid var(--border)',
+              background: catFilter === c.id ? 'var(--accent)' : 'var(--bg-tertiary)',
+              color: catFilter === c.id ? '#fff' : 'var(--text-secondary)',
+              cursor: 'pointer', fontWeight: catFilter === c.id ? 600 : 400,
+            }}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+
       <div className="library-grid">
         {filtered.map((item, i) => (
-          <div key={i} className="lib-item" onClick={() => place(item)} title={`Add ${item.name} to canvas`}>
+          <div key={i} className="lib-item" onClick={() => place(item)} title={`Click to place ${item.name}`}>
             <div className="lib-item-icon">{item.icon}</div>
             <div className="lib-item-name">{item.name}</div>
           </div>
@@ -222,16 +356,9 @@ function LibraryPanel() {
       </div>
       {filtered.length === 0 && (
         <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', padding: 20 }}>
-          No items found. Try a different search.
+          No furniture found matching your search.
         </div>
       )}
-
-      {/* Web search hint */}
-      <div style={{ marginTop: 12, padding: 12, background: 'var(--accent-glow)', border: '1px solid rgba(79,142,247,0.3)', borderRadius: 'var(--radius-md)' }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', marginBottom: 4 }}>🌐 Web Model Search</div>
-        <input className="prop-input" placeholder="Search web for 3D models..." style={{ marginBottom: 8 }} />
-        <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>Search Models</button>
-      </div>
     </div>
   );
 }
