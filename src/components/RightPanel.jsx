@@ -174,6 +174,14 @@ function RoomsPanel() {
               {openWindows.has(selWin.id) ? '🔓 Unlocked & Open (Click to Lock)' : '🔒 Locked (Click to Unlock & Open)'}
             </button>
           </div>
+          <div className="prop-group" style={{ marginTop: 8 }}>
+            <div className="prop-label">Kinematic Mode</div>
+            <select className="prop-input" value={windowModes[selWin.id] || 'sliding'}
+              onChange={() => toggleWindowMode(selWin.id)}>
+              <option value="sliding">↔ Sliding Track</option>
+              <option value="casement">🚪 Casement Hinge (45° Tilt)</option>
+            </select>
+          </div>
           <div className="prop-group">
             <div className="prop-label">Width (cm)</div>
             <input className="prop-input" type="number" value={selWin.width}
@@ -364,7 +372,7 @@ function LibraryPanel() {
 }
 
 function ThemePanel() {
-  const { theme, setTheme } = useDesignStore();
+  const { theme, setTheme, pbrMaterialTheme, setPBRMaterialTheme } = useDesignStore();
 
   return (
     <div>
@@ -379,25 +387,32 @@ function ThemePanel() {
         </div>
       ))}
 
-      <div className="section-header" style={{ marginTop: 16 }}>Custom Colors</div>
+      <div className="section-header" style={{ marginTop: 16 }}>PBR Material Engine</div>
       <div className="prop-group">
-        <div className="prop-label">Wall Color</div>
-        <div className="color-row">
-          {['#e2e8f0','#f5f0e8','#2a2420','#f0ece8','#2a0a3a'].map(c => (
-            <div key={c} className="color-swatch" style={{ background: c }}
-              onClick={() => { /* apply wall color */ }} />
-          ))}
-        </div>
+        <div className="prop-label">Floor PBR Texture</div>
+        <select
+          className="prop-input"
+          value={pbrMaterialTheme.floorTexture}
+          onChange={e => setPBRMaterialTheme({ floorTexture: e.target.value })}
+        >
+          <option value="hardwood_parquet">🪵 Hardwood Parquet</option>
+          <option value="marble_tiles">🏛️ Polished Marble Tiles</option>
+          <option value="ceramic_tiles">🔲 Ceramic Tiles</option>
+          <option value="terracotta">🧱 Terracotta Clay</option>
+          <option value="carpet">🧶 Plush Carpet</option>
+        </select>
       </div>
       <div className="prop-group">
-        <div className="prop-label">Floor Material</div>
-        <select className="prop-input">
-          <option>Hardwood Parquet</option>
-          <option>Polished Concrete</option>
-          <option>Marble Tiles</option>
-          <option>Ceramic Tiles</option>
-          <option>Carpet</option>
-          <option>Terracotta</option>
+        <div className="prop-label">Wall PBR Surface</div>
+        <select
+          className="prop-input"
+          value={pbrMaterialTheme.wallTexture}
+          onChange={e => setPBRMaterialTheme({ wallTexture: e.target.value })}
+        >
+          <option value="modern_paint">🎨 Smooth Modern Paint</option>
+          <option value="brick_stone">🧱 Brick / Stone Accent</option>
+          <option value="wood_panel">🪵 Wood Slats / Paneling</option>
+          <option value="concrete">🏗️ Industrial Concrete</option>
         </select>
       </div>
     </div>

@@ -55,6 +55,17 @@ export const useDesignStore = create(subscribeWithSelector((set, get) => ({
   aiSuggestions: AI_SUGGESTIONS,
   openDoors: new Set(),    // Set of door IDs that are open
   openWindows: new Set(),  // Set of window IDs that are unlocked/open
+  windowModes: {},         // Map of windowId -> 'sliding' | 'casement'
+
+  pbrMaterialTheme: {
+    wallTexture: 'modern_paint',      // 'modern_paint' | 'brick_stone' | 'wood_panel' | 'concrete'
+    floorTexture: 'hardwood_parquet', // 'hardwood_parquet' | 'marble_tiles' | 'ceramic_tiles' | 'terracotta' | 'carpet'
+    exteriorTexture: 'siding_wood',   // 'siding_wood' | 'stone_facade' | 'stucco'
+  },
+
+  entrances: [
+    { id: 'ent-1', roomId: 'room-6', name: 'Main Entrance', x: 310, y: 570, isSpawnPoint: true },
+  ],
 
   viewMode: '2d',          // '2d' | '3d' | 'walkthrough' | 'vr'
   activeTool: 'select',    // 'select' | 'room' | 'door' | 'window' | 'furniture'
@@ -90,7 +101,13 @@ export const useDesignStore = create(subscribeWithSelector((set, get) => ({
   setZoom: (zoom) => set({ zoom: Math.min(3, Math.max(0.2, zoom)) }),
   setPan: (panX, panY) => set({ panX, panY }),
   setTheme: (theme) => set({ theme }),
+  setPBRMaterialTheme: (patch) => set(s => ({ pbrMaterialTheme: { ...s.pbrMaterialTheme, ...patch } })),
   setSnapToGrid: (v) => set({ snapToGrid: v }),
+  toggleWindowMode: (id) => set(s => {
+    const current = s.windowModes[id] || 'sliding';
+    const nextMode = current === 'sliding' ? 'casement' : 'sliding';
+    return { windowModes: { ...s.windowModes, [id]: nextMode } };
+  }),
 
   snap: (val) => {
     const { snapToGrid, gridSize } = get();

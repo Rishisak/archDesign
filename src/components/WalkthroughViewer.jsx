@@ -250,10 +250,37 @@ function PlayerController({ posRef, yawRef, isMovingRef, rooms, onRoomChange }) 
     isMovingRef.current = isMoving;
 
     if (isMoving) {
-      posRef.current = {
+      const candidatePos = {
         x: posRef.current.x + move.current.x,
         z: posRef.current.z + move.current.z,
       };
+
+      // Capsule Wall Collision Prevention (radius: 0.28m)
+      let nx = candidatePos.x;
+      let nz = candidatePos.z;
+      const R = 0.28;
+
+      for (const r of vis) {
+        const minX = r.x * SC;
+        const maxX = (r.x + r.width) * SC;
+        const minZ = r.y * SC;
+        const maxZ = (r.y + r.height) * SC;
+
+        if (nx >= minX - R && nx <= maxX + R && nz >= minZ - R && nz <= maxZ + R) {
+          const dLeft   = Math.abs(nx - minX);
+          const dRight  = Math.abs(nx - maxX);
+          const dTop    = Math.abs(nz - minZ);
+          const dBottom = Math.abs(nz - maxZ);
+          const minD    = Math.min(dLeft, dRight, dTop, dBottom);
+
+          if (minD === dLeft && dLeft < R) nx = minX - R;
+          else if (minD === dRight && dRight < R) nx = maxX + R;
+          else if (minD === dTop && dTop < R) nz = minZ - R;
+          else if (minD === dBottom && dBottom < R) nz = maxZ + R;
+        }
+      }
+
+      posRef.current = { x: nx, z: nz };
     }
 
     // Detect current room
@@ -345,12 +372,11 @@ function Scene({ posRef, yawRef, isMovingRef, onRoomChange }) {
 }
 
 // ── Mini-map ──────────────────────────────────────────────────
-function MiniMap({ rooms, activeFloor, posRef }) {
+function MiniMap({ rooms, activeFloor, posRef, yawRef }) {
   const [dotPos, setDotPos] = useState({ x: 60, y: 60 });
   const [yawDeg, setYawDeg] = useState(0);
   const rafRef = useRef();
 
-  // Poll the posRef every animation frame for smooth updates
   useEffect(() => {
     const tick = () => {
       const vis = rooms.filter(r => r.floor === activeFloor);
@@ -374,11 +400,16 @@ function MiniMap({ rooms, activeFloor, posRef }) {
       const dotY = 6 + (pz - minZ) * sc;
       setDotPos({ x: Math.max(4, Math.min(116, dotX)), y: Math.max(4, Math.min(116, dotY)) });
 
+      if (yawRef?.current !== undefined) {
+        const deg = (yawRef.current * 180) / Math.PI;
+        setYawDeg(deg);
+      }
+
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [rooms, activeFloor, posRef]);
+  }, [rooms, activeFloor, posRef, yawRef]);
 
   const vis = rooms.filter(r => r.floor === activeFloor);
   if (!vis.length) return null;
@@ -414,13 +445,13 @@ function MiniMap({ rooms, activeFloor, posRef }) {
         ))}
         {/* Player direction cone */}
         <polygon
-          points={`${dotPos.x},${dotPos.y - 10} ${dotPos.x - 5},${dotPos.y + 2} ${dotPos.x + 5},${dotPos.y + 2}`}
-          fill="#4f8ef7" opacity="0.9"
-          style={{ transform: `rotate(0deg)`, transformOrigin: `${dotPos.x}px ${dotPos.y}px` }}
+          points={`${dotPos.x},${dotPos.y - 10} ${dotPos.x - 5},${dotPos.y + 3} ${dotPos.x + 5},${dotPos.y + 3}`}
+          fill="#4f8ef7" opacity="0.95"
+          transform={`rotate(${-yawDeg + 180}, ${dotPos.x}, ${dotPos.y})`}
         />
         {/* Player dot */}
-        <circle cx={dotPos.x} cy={dotPos.y} r="5" fill="#4f8ef7" />
-        <circle cx={dotPos.x} cy={dotPos.y} r="9" fill="none" stroke="#4f8ef7" strokeWidth="1" opacity="0.4" />
+        <circle cx={dotPos.x} cy={dotPos.y} r="4" fill="#4f8ef7" />
+        <circle cx={dotPos.x} cy={dotPos.y} r="8" fill="none" stroke="#4f8ef7" strokeWidth="1" opacity="0.5" />
       </svg>
       <div style={{
         position: 'absolute', bottom: 3, width: '100%', textAlign: 'center',

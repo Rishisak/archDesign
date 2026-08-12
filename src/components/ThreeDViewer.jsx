@@ -213,48 +213,92 @@ function RoomContents({ room, cx, cz, rw, rd }) {
   );
 }
 
-// ── Window mesh (transparent glass + frame + interactive sliding sashes) ──
-function WindowMesh({ win, pos, size, isOpen, onToggle }) {
+// ── Window mesh (transparent glass + frame + interactive sliding/casement sashes) ──
+function WindowMesh({ win, pos, size, isOpen, mode = 'sliding', onToggle }) {
   const [fw, fh, fd] = size;
-  const slideX = isOpen ? fw * 0.35 : 0;
+  const slideRef = useRef();
+  const tiltRef  = useRef();
+
+  const targetSlide = isOpen && mode === 'sliding' ? fw * 0.35 : 0;
+  const targetTilt  = isOpen && mode === 'casement' ? -Math.PI / 4 : 0;
+
+  useFrame((_, delta) => {
+    if (slideRef.current) {
+      slideRef.current.position.x = THREE.MathUtils.damp(
+        slideRef.current.position.x,
+        fw * 0.22 - targetSlide,
+        10,
+        delta
+      );
+    }
+    if (tiltRef.current) {
+      tiltRef.current.rotation.y = THREE.MathUtils.damp(
+        tiltRef.current.rotation.y,
+        targetTilt,
+        10,
+        delta
+      );
+    }
+  });
+
   return (
     <group position={pos} onClick={(e) => { e.stopPropagation(); if (onToggle && win) onToggle(win.id); }}>
       {/* Outer frame */}
       <mesh castShadow receiveShadow>
-        <boxGeometry args={[fw, fh, fd]} />
-        <meshStandardMaterial color={isOpen ? "#0284c7" : "#9aa8b0"} roughness={0.3} metalness={0.4} />
+        <boxGeometry args={[fw + 0.02, fh + 0.02, fd * 1.1]} />
+        <meshStandardMaterial color={isOpen ? "#0284c7" : "#869ab0"} roughness={0.3} metalness={0.4} />
       </mesh>
-      {/* Glass Pane - Left */}
+      {/* Fixed Glass Pane - Left */}
       <mesh position={[-fw * 0.22, 0, 0]}>
         <boxGeometry args={[fw * 0.48, fh * 0.85, fd * 0.3]} />
         <meshStandardMaterial color="#a8d0e8" roughness={0.05} metalness={0.1} transparent opacity={0.35} />
       </mesh>
-      {/* Glass Pane - Right (Sliding) */}
-      <mesh position={[fw * 0.22 - slideX, 0, fd * 0.15]}>
-        <boxGeometry args={[fw * 0.48, fh * 0.85, fd * 0.3]} />
-        <meshStandardMaterial color={isOpen ? "#86efac" : "#a8d0e8"} roughness={0.05} metalness={0.1} transparent opacity={0.5} />
-      </mesh>
+      {/* Active Glass Pane (Sliding or Casement) */}
+      {mode === 'casement' ? (
+        <group position={[fw * 0.46, 0, 0]} ref={tiltRef}>
+          <mesh position={[-fw * 0.24, 0, fd * 0.15]}>
+            <boxGeometry args={[fw * 0.48, fh * 0.85, fd * 0.3]} />
+            <meshStandardMaterial color={isOpen ? "#86efac" : "#a8d0e8"} roughness={0.05} metalness={0.1} transparent opacity={0.5} />
+          </mesh>
+        </group>
+      ) : (
+        <mesh position={[fw * 0.22, 0, fd * 0.15]} ref={slideRef}>
+          <boxGeometry args={[fw * 0.48, fh * 0.85, fd * 0.3]} />
+          <meshStandardMaterial color={isOpen ? "#86efac" : "#a8d0e8"} roughness={0.05} metalness={0.1} transparent opacity={0.5} />
+        </mesh>
+      )}
     </group>
   );
 }
 
-// ── Door mesh (interactive swing opening) ────────────────────
+// ── Door mesh (interactive swing opening with smooth frame lerp) ────────────
 function DoorMesh({ door, pos, size, isOpen, onToggle }) {
   const [dw, dh, dd] = size;
   const isH = door.wall === 'top' || door.wall === 'bottom';
-  const openAngle = isH ? -Math.PI / 2 : Math.PI / 2;
-  const angle = isOpen ? openAngle : 0;
+  const targetAngle = isOpen ? (isH ? -Math.PI / 2 : Math.PI / 2) : 0;
+  const hingeRef = useRef();
+
+  useFrame((_, delta) => {
+    if (hingeRef.current) {
+      hingeRef.current.rotation.y = THREE.MathUtils.damp(
+        hingeRef.current.rotation.y,
+        targetAngle,
+        12,
+        delta
+      );
+    }
+  });
 
   return (
     <group position={pos} onClick={(e) => { e.stopPropagation(); if (onToggle && door) onToggle(door.id); }}>
       {/* Door Frame */}
       <mesh castShadow receiveShadow>
-        <boxGeometry args={[dw + 0.02, dh + 0.02, dd * 1.1]} />
+        <boxGeometry args={[dw + 0.03, dh + 0.03, dd * 1.1]} />
         <meshStandardMaterial color="#6b4c2a" roughness={0.7} />
       </mesh>
 
-      {/* Hinge Group at Corner */}
-      <group position={[-dw / 2, 0, 0]} rotation={[0, angle, 0]}>
+      {/* Hinge Pivot Group */}
+      <group position={[-dw / 2, 0, 0]} ref={hingeRef}>
         {/* Door Leaf */}
         <mesh position={[dw / 2, 0, 0]} castShadow receiveShadow>
           <boxGeometry args={[dw * 0.96, dh * 0.96, dd * 0.7]} />
@@ -263,9 +307,31 @@ function DoorMesh({ door, pos, size, isOpen, onToggle }) {
         {/* Brass Knob */}
         <mesh position={[dw * 0.85, 0, dd * 0.6]} castShadow>
           <sphereGeometry args={[0.04, 8, 8]} />
-          <meshStandardMaterial color="#c8a840" roughness={0.2} metalness={0.8} />
+          <meshStandardMaterial color="#c8a840" roughness={0.2} metalness={0.85} />
         </mesh>
       </group>
+    </group>
+  );
+}
+
+// ── Staircase Mesh ───────────────────────────────────────────
+function StairsMesh({ pos = [3.1, 0, 3.7], width = 1.0, height = 2.4, depth = 2.6, steps = 12 }) {
+  const stepH = height / steps;
+  const stepD = depth / steps;
+
+  return (
+    <group position={pos}>
+      {Array.from({ length: steps }).map((_, i) => (
+        <mesh key={i} position={[0, (i + 0.5) * stepH, (i + 0.5) * stepD]} castShadow receiveShadow>
+          <boxGeometry args={[width, stepH, stepD]} />
+          <meshStandardMaterial color="#d4b483" roughness={0.45} />
+        </mesh>
+      ))}
+      {/* Wooden Handrail */}
+      <mesh position={[width * 0.48, height * 0.55, depth * 0.5]} rotation={[Math.atan2(height, depth), 0, 0]}>
+        <boxGeometry args={[0.06, 0.08, Math.hypot(height, depth)]} />
+        <meshStandardMaterial color="#6b4c2a" roughness={0.5} />
+      </mesh>
     </group>
   );
 }
@@ -400,7 +466,7 @@ function renderFurnitureMesh(type, w, d, color, label) {
 }
 
 // ── Individual room ───────────────────────────────────────────
-function Room({ room, allDoors, allWindows, openDoors, openWindows, toggleDoor, toggleWindow }) {
+function Room({ room, allDoors, allWindows, openDoors, openWindows, windowModes = {}, toggleDoor, toggleWindow }) {
   const x  = room.x * SC;
   const z  = room.y * SC;
   const rw = room.width  * SC;
@@ -463,7 +529,8 @@ function Room({ room, allDoors, allWindows, openDoors, openWindows, toggleDoor, 
       {windows.map((win, i) => {
         const info = getWindowPos(x, z, rw, rd, win);
         const isOpen = openWindows.has(win.id);
-        return <WindowMesh key={win.id || i} win={win} pos={info.pos} size={info.size} isOpen={isOpen} onToggle={toggleWindow} />;
+        const mode   = windowModes[win.id] || 'sliding';
+        return <WindowMesh key={win.id || i} win={win} pos={info.pos} size={info.size} isOpen={isOpen} mode={mode} onToggle={toggleWindow} />;
       })}
 
       {/* ── Interior warm light ── */}
@@ -531,7 +598,7 @@ function getWindowPos(x, z, rw, rd, win) {
 
 // ── Entire scene ──────────────────────────────────────────────
 function Scene({ showRoof, timeOfDay }) {
-  const { rooms, doors, windows, furniture, activeFloor, openDoors, toggleDoor, openWindows, toggleWindow } = useDesignStore();
+  const { rooms, doors, windows, furniture, activeFloor, openDoors, toggleDoor, openWindows, windowModes, toggleWindow } = useDesignStore();
   const vis = rooms.filter(r => r.floor === activeFloor);
   const visFurn = furniture.filter(f => f.floor === activeFloor);
 
@@ -596,10 +663,14 @@ function Scene({ showRoof, timeOfDay }) {
           allWindows={windows}
           openDoors={openDoors}
           openWindows={openWindows}
+          windowModes={windowModes}
           toggleDoor={toggleDoor}
           toggleWindow={toggleWindow}
         />
       ))}
+
+      {/* ── Central Staircase ── */}
+      <StairsMesh pos={[3.1, 0, 3.7]} width={1.1} height={2.5} depth={2.4} steps={12} />
 
       {/* ── User Placed Furniture ── */}
       {visFurn.map(f => (
