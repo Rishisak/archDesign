@@ -457,6 +457,9 @@ function renderFurnitureMesh(type, w, d, color, label) {
         </group>
       );
 
+    case 'stairs':
+      return <StairsMesh pos={[-w / 2, 0, -d / 2]} width={w} height={2.4} depth={d} steps={12} />;
+
     case 'plant':
       return <Plant pos={[0, 0, 0]} scale={w * 1.5} />;
 
@@ -668,9 +671,6 @@ function Scene({ showRoof, timeOfDay }) {
           toggleWindow={toggleWindow}
         />
       ))}
-
-      {/* ── Central Staircase ── */}
-      <StairsMesh pos={[3.1, 0, 3.7]} width={1.1} height={2.5} depth={2.4} steps={12} />
 
       {/* ── User Placed Furniture ── */}
       {visFurn.map(f => (

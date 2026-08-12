@@ -41,6 +41,7 @@ export const LIBRARY_ITEMS = [
   { category: 'decor', icon: '🛁', name: 'Bathtub',          type: 'bath',           w: 80,  h: 150, color: '#0288d1' },
   { category: 'decor', icon: '🚿', name: 'Shower Cabinet',   type: 'shower',         w: 90,  h: 90, color: '#03a9f4' },
   { category: 'decor', icon: '🌿', name: 'Plant',           type: 'plant',          w: 40,  h: 40, color: '#2e7d32' },
+  { category: 'decor', icon: '🪜', name: 'Staircase',       type: 'stairs',         w: 110, h: 240, color: '#d4b483' },
 ];
 
 const THEMES = [
