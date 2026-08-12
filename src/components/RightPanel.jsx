@@ -131,7 +131,7 @@ function AIPanel() {
 function RoomsPanel() {
   const {
     rooms, doors, windows, furniture, selectedId, setSelectedId,
-    updateRoom, deleteRoom, updateFurniture, deleteFurniture,
+    updateRoom, deleteRoom, extendRoom, mergeRooms, updateFurniture, deleteFurniture,
     updateDoor, deleteDoor, updateWindow, deleteWindow,
     openDoors, toggleDoor, openWindows, toggleWindow, activeFloor
   } = useDesignStore();
@@ -276,7 +276,45 @@ function RoomsPanel() {
                 onChange={e => updateRoom(selRoom.id, { height: +e.target.value })} />
             </div>
           </div>
-          <button className="btn btn-danger w-full" style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}
+
+          {/* Quick Extend Room Buttons */}
+          <div className="prop-group" style={{ marginTop: 8 }}>
+            <div className="prop-label">📐 Extend Room Dimension</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+              <button className="btn btn-secondary" style={{ fontSize: 11, padding: '4px' }} onClick={() => extendRoom(selRoom.id, 'top', 50)}>↑ Top +50cm</button>
+              <button className="btn btn-secondary" style={{ fontSize: 11, padding: '4px' }} onClick={() => extendRoom(selRoom.id, 'bottom', 50)}>↓ Bottom +50cm</button>
+              <button className="btn btn-secondary" style={{ fontSize: 11, padding: '4px' }} onClick={() => extendRoom(selRoom.id, 'left', 50)}>← Left +50cm</button>
+              <button className="btn btn-secondary" style={{ fontSize: 11, padding: '4px' }} onClick={() => extendRoom(selRoom.id, 'right', 50)}>→ Right +50cm</button>
+            </div>
+          </div>
+
+          {/* Join / Merge Rooms */}
+          {vis.filter(r => r.id !== selRoom.id).length > 0 && (
+            <div className="prop-group" style={{ marginTop: 8 }}>
+              <div className="prop-label">🔗 Join / Merge Room</div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <select id="merge-room-target" className="prop-input" style={{ fontSize: 11 }}>
+                  {vis.filter(r => r.id !== selRoom.id).map(other => (
+                    <option key={other.id} value={other.id}>{other.name}</option>
+                  ))}
+                </select>
+                <button
+                  className="btn btn-primary"
+                  style={{ fontSize: 11, padding: '4px 8px', whiteSpace: 'nowrap' }}
+                  onClick={() => {
+                    const targetEl = document.getElementById('merge-room-target');
+                    if (targetEl && targetEl.value) {
+                      mergeRooms(selRoom.id, targetEl.value);
+                    }
+                  }}
+                >
+                  🔗 Merge
+                </button>
+              </div>
+            </div>
+          )}
+
+          <button className="btn btn-danger w-full" style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}
             onClick={() => deleteRoom(selRoom.id)}>🗑 Delete Room</button>
         </div>
       )}

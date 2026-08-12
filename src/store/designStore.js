@@ -136,6 +136,88 @@ export const useDesignStore = create(subscribeWithSelector((set, get) => ({
     selectedId: s.selectedId === id ? null : s.selectedId,
   })),
 
+  // Room Extending & Merging
+  extendRoom: (id, dir, delta = 40) => set(s => ({
+    rooms: s.rooms.map(r => {
+      if (r.id !== id) return r;
+      if (dir === 'top')    return { ...r, y: Math.max(0, r.y - delta), height: r.height + delta };
+      if (dir === 'bottom') return { ...r, height: Math.max(40, r.height + delta) };
+      if (dir === 'left')   return { ...r, x: Math.max(0, r.x - delta), width: r.width + delta };
+      if (dir === 'right')  return { ...r, width: Math.max(40, r.width + delta) };
+      return r;
+    })
+  })),
+
+  mergeRooms: (id1, id2) => set(s => {
+    const r1 = s.rooms.find(r => r.id === id1);
+    const r2 = s.rooms.find(r => r.id === id2);
+    if (!r1 || !r2) return {};
+
+    const minX = Math.min(r1.x, r2.x);
+    const minY = Math.min(r1.y, r2.y);
+    const maxX = Math.max(r1.x + r1.width, r2.x + r2.width);
+    const maxY = Math.max(r1.y + r1.height, r2.y + r2.height);
+
+    const mergedRoom = {
+      ...r1,
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+      name: `${r1.name} & ${r2.name} (Merged)`,
+    };
+
+    return {
+      rooms: s.rooms.map(r => r.id === id1 ? mergedRoom : r).filter(r => r.id !== id2),
+      doors: s.doors.map(d => d.roomId === id2 ? { ...d, roomId: id1 } : d),
+      windows: s.windows.map(w => w.roomId === id2 ? { ...w, roomId: id1 } : w),
+      furniture: s.furniture.map(f => f.roomId === id2 ? { ...f, roomId: id1 } : f),
+      selectedId: id1,
+    };
+  }),
+
+  // File Import / Export
+  exportProjectJSON: () => {
+    const { rooms, doors, windows, furniture, floors, activeFloor, theme, pbrMaterialTheme, windowModes } = get();
+    const projectData = {
+      version: '1.0',
+      timestamp: new Date().toISOString(),
+      rooms, doors, windows, furniture, floors, activeFloor, theme, pbrMaterialTheme, windowModes
+    };
+    const jsonStr = JSON.stringify(projectData, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `archDesign_project_${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  importProjectJSON: (jsonData) => {
+    try {
+      const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
+      if (!data.rooms || !Array.isArray(data.rooms)) throw new Error('Invalid project file format.');
+      set({
+        rooms: data.rooms || [],
+        doors: data.doors || [],
+        windows: data.windows || [],
+        furniture: data.furniture || [],
+        floors: data.floors || [{ id: 0, name: 'Ground Floor', height: 0 }],
+        activeFloor: data.activeFloor ?? 0,
+        theme: data.theme || 'modern',
+        pbrMaterialTheme: data.pbrMaterialTheme || { wallTexture: 'modern_paint', floorTexture: 'hardwood_parquet', exteriorTexture: 'siding_wood' },
+        windowModes: data.windowModes || {},
+        selectedId: null,
+      });
+      return true;
+    } catch (err) {
+      console.error('Import error:', err);
+      alert('Failed to import file: ' + err.message);
+      return false;
+    }
+  },
+
   // Door / Window
   addDoor: (door) => set((s) => ({ doors: [...s.doors, { id: genId('door'), ...door }] })),
   addWindow: (win) => set((s) => ({ windows: [...s.windows, { id: genId('win'), ...win }] })),

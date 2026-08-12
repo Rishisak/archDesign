@@ -271,7 +271,7 @@ function WindowMesh({ win, pos, size, isOpen, mode = 'sliding', onToggle }) {
   );
 }
 
-// ── Door mesh (interactive swing opening with smooth frame lerp) ────────────
+// ── Door mesh (interactive swing opening with single-pivot 90° frame lerp) ──
 function DoorMesh({ door, pos, size, isOpen, onToggle }) {
   const [dw, dh, dd] = size;
   const isH = door.wall === 'top' || door.wall === 'bottom';
@@ -283,7 +283,7 @@ function DoorMesh({ door, pos, size, isOpen, onToggle }) {
       hingeRef.current.rotation.y = THREE.MathUtils.damp(
         hingeRef.current.rotation.y,
         targetAngle,
-        12,
+        14,
         delta
       );
     }
@@ -293,19 +293,19 @@ function DoorMesh({ door, pos, size, isOpen, onToggle }) {
     <group position={pos} onClick={(e) => { e.stopPropagation(); if (onToggle && door) onToggle(door.id); }}>
       {/* Door Frame */}
       <mesh castShadow receiveShadow>
-        <boxGeometry args={[dw + 0.03, dh + 0.03, dd * 1.1]} />
-        <meshStandardMaterial color="#6b4c2a" roughness={0.7} />
+        <boxGeometry args={[dw + 0.03, dh + 0.03, dd * 1.05]} />
+        <meshStandardMaterial color="#6b4c2a" roughness={0.7} polygonOffset polygonOffsetFactor={0.5} polygonOffsetUnits={0.5} />
       </mesh>
 
-      {/* Hinge Pivot Group */}
+      {/* Single Hinge Pivot Group at Frame Corner */}
       <group position={[-dw / 2, 0, 0]} ref={hingeRef}>
         {/* Door Leaf */}
         <mesh position={[dw / 2, 0, 0]} castShadow receiveShadow>
-          <boxGeometry args={[dw * 0.96, dh * 0.96, dd * 0.7]} />
-          <meshStandardMaterial color={isOpen ? "#e8b878" : "#7a5c3a"} roughness={0.65} />
+          <boxGeometry args={[dw * 0.96, dh * 0.96, dd * 0.65]} />
+          <meshStandardMaterial color={isOpen ? "#e8b878" : "#7a5c3a"} roughness={0.65} polygonOffset polygonOffsetFactor={0.2} polygonOffsetUnits={0.2} />
         </mesh>
         {/* Brass Knob */}
-        <mesh position={[dw * 0.85, 0, dd * 0.6]} castShadow>
+        <mesh position={[dw * 0.85, 0, dd * 0.55]} castShadow>
           <sphereGeometry args={[0.04, 8, 8]} />
           <meshStandardMaterial color="#c8a840" roughness={0.2} metalness={0.85} />
         </mesh>

@@ -33,14 +33,15 @@ export default function Canvas2D() {
   const [mousePos,  setMousePos]  = useState({ x: 0, y: 0 });
   const [centered,  setCentered]  = useState(false);
 
-  const dragFurnRef = useRef(null);
+  const dragFurnRef       = useRef(null);
+  const dragRoomHandleRef = useRef(null);
 
   const {
     rooms, doors, windows, furniture, activeFloor,
     activeTool, setActiveTool, selectedId, setSelectedId,
     isDrawingRoom, drawStart, drawCurrent,
     startDrawing, updateDrawing, finishDrawing, cancelDrawing,
-    deleteRoom, deleteFurniture, snap, addDoor, addWindow, addFurniture, updateFurniture,
+    addRoom, updateRoom, deleteRoom, deleteFurniture, snap, addDoor, addWindow, addFurniture, updateFurniture,
     openDoors, toggleDoor, openWindows, toggleWindow,
   } = useDesignStore();
 
@@ -139,10 +140,38 @@ export default function Canvas2D() {
       return;
     }
 
+    if (dragRoomHandleRef.current) {
+      const { id, handle, startX, startY, initialX, initialY, initialW, initialH } = dragRoomHandleRef.current;
+      const dx = w.x - startX;
+      const dy = w.y - startY;
+      const patch = {};
+
+      if (handle.includes('left')) {
+        const newW = snap(Math.max(40, initialW - dx));
+        const newX = initialX + (initialW - newW);
+        patch.x = newX; patch.width = newW;
+      }
+      if (handle.includes('right')) {
+        patch.width = snap(Math.max(40, initialW + dx));
+      }
+      if (handle.includes('top')) {
+        const newH = snap(Math.max(40, initialH - dy));
+        const newY = initialY + (initialH - newH);
+        patch.y = newY; patch.height = newH;
+      }
+      if (handle.includes('bottom')) {
+        patch.height = snap(Math.max(40, initialH + dy));
+      }
+
+      updateRoom(id, patch);
+      return;
+    }
+
     if (isDrawingRoom) updateDrawing({ x: snap(w.x), y: snap(w.y) });
-  }, [isDrawingRoom, toWorld, snap, updateDrawing, updateFurniture]);
+  }, [isDrawingRoom, toWorld, snap, updateDrawing, updateFurniture, updateRoom]);
 
   const onMouseUp = useCallback(() => {
+    if (dragRoomHandleRef.current) { dragRoomHandleRef.current = null; return; }
     if (dragFurnRef.current) { dragFurnRef.current = null; return; }
     if (isPanRef.current) { isPanRef.current = false; return; }
     if (isDrawingRoom) finishDrawing();
@@ -316,6 +345,39 @@ export default function Canvas2D() {
                     transform={`rotate(-90,${room.x-26/z},${room.y+room.height/2})`}>
                     {(room.height/100).toFixed(1)} m
                   </text>
+
+                  {/* Room Extension Handles */}
+                  {[
+                    { handle: 'top-left',     hx: room.x,                  hy: room.y,                  cursor: 'nwse-resize' },
+                    { handle: 'top',          hx: room.x + room.width / 2, hy: room.y,                  cursor: 'ns-resize'   },
+                    { handle: 'top-right',    hx: room.x + room.width,     hy: room.y,                  cursor: 'nesw-resize' },
+                    { handle: 'left',         hx: room.x,                  hy: room.y + room.height / 2,cursor: 'ew-resize'   },
+                    { handle: 'right',        hx: room.x + room.width,     hy: room.y + room.height / 2,cursor: 'ew-resize'   },
+                    { handle: 'bottom-left',  hx: room.x,                  hy: room.y + room.height,    cursor: 'nesw-resize' },
+                    { handle: 'bottom',       hx: room.x + room.width / 2, hy: room.y + room.height,    cursor: 'ns-resize'   },
+                    { handle: 'bottom-right', hx: room.x + room.width,     hy: room.y + room.height,    cursor: 'nwse-resize' },
+                  ].map(h => (
+                    <circle
+                      key={h.handle}
+                      cx={h.hx} cy={h.hy} r={6/z}
+                      fill="#ffffff" stroke="#4f8ef7" strokeWidth={2/z}
+                      style={{ cursor: h.cursor }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        const w = toWorld(e.clientX, e.clientY);
+                        dragRoomHandleRef.current = {
+                          id: room.id,
+                          handle: h.handle,
+                          startX: w.x,
+                          startY: w.y,
+                          initialX: room.x,
+                          initialY: room.y,
+                          initialW: room.width,
+                          initialH: room.height,
+                        };
+                      }}
+                    />
+                  ))}
                 </>}
               </g>
             );

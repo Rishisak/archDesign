@@ -11,7 +11,23 @@ const VIEWS = [
 export default function Header() {
   const { viewMode, setViewMode, activeFloor, setActiveFloor, floors,
           showAIPanel, setShowAIPanel, showLibrary, setShowLibrary,
-          snapToGrid, setSnapToGrid, clearDesign, loadDemo, zoom, setZoom } = useDesignStore();
+          snapToGrid, setSnapToGrid, clearDesign, loadDemo,
+          exportProjectJSON, importProjectJSON } = useDesignStore();
+
+  const fileInputRef = React.useRef(null);
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      if (evt.target?.result) {
+        importProjectJSON(evt.target.result);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
 
   return (
     <header style={{
@@ -70,6 +86,39 @@ export default function Header() {
 
       {/* Actions */}
       <div className="header-actions">
+        {/* Hidden File Input */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept=".json"
+          style={{ display: 'none' }}
+          onChange={handleFileUpload}
+        />
+
+        {/* Open Project File */}
+        <button
+          className="btn btn-secondary"
+          onClick={() => fileInputRef.current?.click()}
+          title="Open Saved Project File (.json)"
+          style={{ gap: 6, fontSize: 12, padding: '4px 10px' }}
+        >
+          <span>📂</span>
+          <span>Open File</span>
+        </button>
+
+        {/* Save Project File */}
+        <button
+          className="btn btn-primary"
+          onClick={exportProjectJSON}
+          title="Save Design File (.json)"
+          style={{ gap: 6, fontSize: 12, padding: '4px 10px' }}
+        >
+          <span>💾</span>
+          <span>Save File</span>
+        </button>
+
+        <div className="header-divider" style={{ margin: '0 4px' }} />
+
         {/* Snap to grid */}
         <button
           className={`icon-btn ${snapToGrid ? 'active' : ''}`}
