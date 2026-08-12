@@ -8,7 +8,7 @@ const ROOM_COLORS = [
 
 const ROOM_TYPES = ['living','bedroom','kitchen','bathroom','dining','hallway','study','gym','cinema','other'];
 
-const LIBRARY_ITEMS = [
+export const LIBRARY_ITEMS = [
   // ── Doors & Openings ──
   { category: 'doors', icon: '🚪', name: 'Single Door',       type: 'door_single',    w: 80,  h: 20, color: '#c8923a' },
   { category: 'doors', icon: '🚪', name: 'Double Door',       type: 'door_double',    w: 140, h: 20, color: '#c8923a' },
@@ -356,7 +356,14 @@ function LibraryPanel() {
 
       <div className="library-grid">
         {filtered.map((item, i) => (
-          <div key={i} className="lib-item" onClick={() => place(item)} title={`Click to place ${item.name}`}>
+          <div
+            key={i}
+            className="lib-item"
+            onClick={() => place(item)}
+            draggable={true}
+            onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify(item))}
+            title={`Click or Drag to place ${item.name}`}
+          >
             <div className="lib-item-icon">{item.icon}</div>
             <div className="lib-item-name">{item.name}</div>
           </div>

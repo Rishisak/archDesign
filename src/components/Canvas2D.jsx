@@ -33,12 +33,14 @@ export default function Canvas2D() {
   const [mousePos,  setMousePos]  = useState({ x: 0, y: 0 });
   const [centered,  setCentered]  = useState(false);
 
+  const dragFurnRef = useRef(null);
+
   const {
     rooms, doors, windows, furniture, activeFloor,
-    activeTool, selectedId, setSelectedId,
+    activeTool, setActiveTool, selectedId, setSelectedId,
     isDrawingRoom, drawStart, drawCurrent,
     startDrawing, updateDrawing, finishDrawing, cancelDrawing,
-    deleteRoom, deleteFurniture, snap, addDoor, addWindow, addFurniture,
+    deleteRoom, deleteFurniture, snap, addDoor, addWindow, addFurniture, updateFurniture,
     openDoors, toggleDoor, openWindows, toggleWindow,
   } = useDesignStore();
 
@@ -100,7 +102,7 @@ export default function Canvas2D() {
 
     if (activeTool === 'furniture') {
       const at = visRooms.find(r => w.x >= r.x && w.x <= r.x + r.width && w.y >= r.y && w.y <= r.y + r.height);
-      addFurniture({ roomId: at?.id ?? null, type: 'chair', x: snap(w.x)-30, y: snap(w.y)-30, width: 60, height: 60, color: '#b4c4d4', label: 'Chair' });
+      addFurniture({ roomId: at?.id ?? null, type: 'sofa', x: snap(w.x)-60, y: snap(w.y)-40, width: 120, height: 80, color: '#546e7a', label: '3-Seater Sofa' });
       return;
     }
 
@@ -126,15 +128,63 @@ export default function Canvas2D() {
       setLocalPan({ x: nx, y: ny });
       return;
     }
+
     const w = toWorld(e.clientX, e.clientY);
     setMousePos(w);
+
+    if (dragFurnRef.current) {
+      const nx = snap(w.x - dragFurnRef.current.offsetX);
+      const ny = snap(w.y - dragFurnRef.current.offsetY);
+      updateFurniture(dragFurnRef.current.id, { x: nx, y: ny });
+      return;
+    }
+
     if (isDrawingRoom) updateDrawing({ x: snap(w.x), y: snap(w.y) });
-  }, [isDrawingRoom, toWorld, snap, updateDrawing]);
+  }, [isDrawingRoom, toWorld, snap, updateDrawing, updateFurniture]);
 
   const onMouseUp = useCallback(() => {
+    if (dragFurnRef.current) { dragFurnRef.current = null; return; }
     if (isPanRef.current) { isPanRef.current = false; return; }
     if (isDrawingRoom) finishDrawing();
   }, [isDrawingRoom, finishDrawing]);
+
+  const onMouseDownFurniture = useCallback((e, item) => {
+    e.stopPropagation();
+    setSelectedId(item.id);
+    if (e.button !== 0) return;
+    const w = toWorld(e.clientX, e.clientY);
+    dragFurnRef.current = {
+      id: item.id,
+      offsetX: w.x - item.x,
+      offsetY: w.y - item.y,
+    };
+  }, [setSelectedId, toWorld]);
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    try {
+      const raw = e.dataTransfer.getData('application/json');
+      if (!raw) return;
+      const item = JSON.parse(raw);
+      const w = toWorld(e.clientX, e.clientY);
+      const nx = snap(w.x - (item.w || 80) / 2);
+      const ny = snap(w.y - (item.h || 80) / 2);
+      addFurniture({
+        roomId: null,
+        type: item.type,
+        x: nx,
+        y: ny,
+        width: item.w || 80,
+        height: item.h || 80,
+        color: item.color || '#607d8b',
+        label: item.name || 'Furniture',
+        rotation: 0,
+      });
+      setActiveTool('select');
+    } catch (err) {
+      console.error('Failed to drop furniture item:', err);
+    }
+  }, [toWorld, snap, addFurniture, setActiveTool]);
 
   // Wheel zoom attached non-passively
   useEffect(() => {
@@ -196,6 +246,8 @@ export default function Canvas2D() {
       onMouseMove={onMouseMove}
       onMouseUp={onMouseUp}
       onMouseLeave={onMouseUp}
+      onDragOver={e => e.preventDefault()}
+      onDrop={handleDrop}
     >
       {/* Grid background */}
       <div style={{
@@ -444,6 +496,7 @@ export default function Canvas2D() {
               item={f}
               selected={selectedId === f.id}
               z={z}
+              onMouseDown={e => onMouseDownFurniture(e, f)}
               onClick={e => {
                 e.stopPropagation();
                 if (activeTool === 'select') setSelectedId(f.id);
@@ -549,7 +602,7 @@ function ToolHint({ children }) {
   );
 }
 
-function Furniture2D({ item, selected, z, onClick }) {
+function Furniture2D({ item, selected, z, onClick, onMouseDown }) {
   const { x, y, width: w, height: h, color, label, type, rotation = 0 } = item;
   const rot = rotation || 0;
   const cx  = x + w / 2;
@@ -713,7 +766,8 @@ function Furniture2D({ item, selected, z, onClick }) {
   return (
     <g
       onClick={onClick}
-      style={{ cursor: 'pointer' }}
+      onMouseDown={onMouseDown}
+      style={{ cursor: 'grab' }}
       transform={rot ? `rotate(${rot}, ${cx}, ${cy})` : undefined}
     >
       {selected && (

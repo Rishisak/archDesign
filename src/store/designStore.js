@@ -4,38 +4,49 @@ import { subscribeWithSelector } from 'zustand/middleware';
 let nextId = 100;
 const genId = (prefix = 'el') => `${prefix}-${nextId++}-${Math.random().toString(36).slice(2,6)}`;
 
-// ─── Default rooms for demo ───────────────────────────────────────────────────
+// ─── Default rooms & furniture for demo apartment (Image 5) ─────────
 const DEFAULT_ROOMS = [
-  { id: 'room-1', name: 'Living Room',  x: 50,  y: 50,  width: 320, height: 240, color: '#e8f4f8', floor: 0, type: 'living'   },
-  { id: 'room-2', name: 'Kitchen',      x: 370, y: 50,  width: 200, height: 240, color: '#fff4e8', floor: 0, type: 'kitchen'  },
-  { id: 'room-3', name: 'Master Bed',   x: 50,  y: 290, width: 240, height: 200, color: '#f0e8ff', floor: 0, type: 'bedroom'  },
-  { id: 'room-4', name: 'Bedroom 2',    x: 290, y: 290, width: 180, height: 200, color: '#e8ffef', floor: 0, type: 'bedroom'  },
-  { id: 'room-5', name: 'Bathroom',     x: 470, y: 290, width: 100, height: 200, color: '#e8f8ff', floor: 0, type: 'bathroom' },
-  { id: 'room-6', name: 'Hallway',      x: 50,  y: 490, width: 520, height: 80,  color: '#f5f5f5', floor: 0, type: 'hallway'  },
+  { id: 'room-1', name: 'Living Room',        x: 50,  y: 50,  width: 340, height: 260, color: '#f0f4f8', floor: 0, type: 'living'   },
+  { id: 'room-2', name: 'Dining & Kitchen',   x: 50,  y: 310, width: 340, height: 260, color: '#fff6ec', floor: 0, type: 'kitchen'  },
+  { id: 'room-3', name: 'Master Bedroom',     x: 390, y: 50,  width: 240, height: 200, color: '#f5f0ff', floor: 0, type: 'bedroom'  },
+  { id: 'room-4', name: 'Kids Bedroom',       x: 630, y: 50,  width: 220, height: 200, color: '#efffef', floor: 0, type: 'bedroom'  },
+  { id: 'room-5', name: 'Guest Bedroom',      x: 630, y: 350, width: 220, height: 220, color: '#fff0f5', floor: 0, type: 'bedroom'  },
+  { id: 'room-6', name: 'En-Suite Bathroom',  x: 390, y: 250, width: 240, height: 100, color: '#e8f8ff', floor: 0, type: 'bathroom' },
+  { id: 'room-7', name: 'Guest Bathroom',     x: 630, y: 250, width: 220, height: 100, color: '#e8f8ff', floor: 0, type: 'bathroom' },
+  { id: 'room-8', name: 'Balcony Terrace',    x: 50,  y: 570, width: 340, height: 140, color: '#f4f0e6', floor: 0, type: 'hallway'  },
 ];
 
 const DEFAULT_DOORS = [
-  { id: 'door-1', roomId: 'room-1', wall: 'right',  position: 0.5, width: 80 },
-  { id: 'door-2', roomId: 'room-3', wall: 'right',  position: 0.5, width: 80 },
-  { id: 'door-3', roomId: 'room-2', wall: 'bottom', position: 0.5, width: 80 },
-  { id: 'door-4', roomId: 'room-4', wall: 'bottom', position: 0.5, width: 80 },
-  { id: 'door-5', roomId: 'room-5', wall: 'left',   position: 0.5, width: 60 },
+  { id: 'door-1', roomId: 'room-1', wall: 'bottom', position: 0.3, width: 90 },
+  { id: 'door-2', roomId: 'room-3', wall: 'bottom', position: 0.5, width: 80 },
+  { id: 'door-3', roomId: 'room-4', wall: 'bottom', position: 0.5, width: 80 },
+  { id: 'door-4', roomId: 'room-5', wall: 'top',    position: 0.5, width: 80 },
+  { id: 'door-5', roomId: 'room-6', wall: 'bottom', position: 0.5, width: 70 },
+  { id: 'door-6', roomId: 'room-7', wall: 'top',    position: 0.5, width: 70 },
 ];
 
 const DEFAULT_WINDOWS = [
-  { id: 'win-1', roomId: 'room-1', wall: 'top',    position: 0.3, width: 80 },
-  { id: 'win-2', roomId: 'room-1', wall: 'top',    position: 0.7, width: 80 },
-  { id: 'win-3', roomId: 'room-2', wall: 'top',    position: 0.5, width: 70 },
-  { id: 'win-4', roomId: 'room-3', wall: 'left',   position: 0.5, width: 90 },
-  { id: 'win-5', roomId: 'room-4', wall: 'right',  position: 0.5, width: 80 },
+  { id: 'win-1', roomId: 'room-1', wall: 'top',   position: 0.5, width: 140 },
+  { id: 'win-2', roomId: 'room-3', wall: 'top',   position: 0.5, width: 110 },
+  { id: 'win-3', roomId: 'room-4', wall: 'top',   position: 0.5, width: 100 },
+  { id: 'win-4', roomId: 'room-5', wall: 'right', position: 0.5, width: 110 },
+  { id: 'win-5', roomId: 'room-8', wall: 'left',  position: 0.5, width: 120 },
 ];
 
 const DEFAULT_FURNITURE = [
-  { id: 'furn-1', roomId: 'room-1', type: 'sofa',    x: 100, y: 130, width: 160, height: 70,  color: '#b4c4d4', label: 'Sofa',        floor: 0 },
-  { id: 'furn-2', roomId: 'room-1', type: 'tv',      x: 100, y: 60,  width: 120, height: 20,  color: '#333',    label: 'TV Console',   floor: 0 },
-  { id: 'furn-3', roomId: 'room-2', type: 'table',   x: 400, y: 100, width: 100, height: 60,  color: '#d4b483', label: 'Dining Table', floor: 0 },
-  { id: 'furn-4', roomId: 'room-3', type: 'bed',     x: 70,  y: 320, width: 140, height: 180, color: '#c4a0d4', label: 'Queen Bed',    floor: 0 },
-  { id: 'furn-5', roomId: 'room-4', type: 'bed',     x: 310, y: 320, width: 120, height: 140, color: '#a0d4c4', label: 'Twin Bed',     floor: 0 },
+  { id: 'furn-1', roomId: 'room-1', type: 'sofa_sectional', x: 210, y: 70,  width: 160, height: 210, color: '#eceff1', label: 'Sectional Sofa', floor: 0 },
+  { id: 'furn-2', roomId: 'room-1', type: 'table_coffee',   x: 130, y: 130, width: 70,  height: 50,  color: '#8d6e63', label: 'Coffee Table',   floor: 0 },
+  { id: 'furn-3', roomId: 'room-1', type: 'tv_unit',        x: 65,  y: 110, width: 30,  height: 140, color: '#4e342e', label: 'TV Wall Unit',   floor: 0 },
+  { id: 'furn-4', roomId: 'room-2', type: 'dining_6',       x: 90,  y: 350, width: 160, height: 90,  color: '#795548', label: 'Dining Set',     floor: 0 },
+  { id: 'furn-5', roomId: 'room-2', type: 'desk',           x: 270, y: 340, width: 50,  height: 130, color: '#d7ccc8', label: 'Kitchen Island', floor: 0 },
+  { id: 'furn-6', roomId: 'room-3', type: 'bed_king',       x: 430, y: 65,  width: 160, height: 170, color: '#7b1fa2', label: 'King Bed',       floor: 0 },
+  { id: 'furn-7', roomId: 'room-3', type: 'nightstand',     x: 395, y: 65,  width: 30,  height: 35,  color: '#bcaaa4', label: 'Nightstand',     floor: 0 },
+  { id: 'furn-8', roomId: 'room-3', type: 'nightstand',     x: 595, y: 65,  width: 30,  height: 35,  color: '#bcaaa4', label: 'Nightstand',     floor: 0 },
+  { id: 'furn-9', roomId: 'room-4', type: 'bed_single',     x: 660, y: 65,  width: 110, height: 160, color: '#8e24aa', label: 'Single Bed',     floor: 0 },
+  { id: 'furn-10',roomId: 'room-4', type: 'desk',           x: 775, y: 150, width: 65,  height: 45,  color: '#5d4037', label: 'Study Desk',     floor: 0 },
+  { id: 'furn-11',roomId: 'room-5', type: 'bed_queen',      x: 660, y: 380, width: 150, height: 170, color: '#ab47bc', label: 'Queen Bed',      floor: 0 },
+  { id: 'furn-12',roomId: 'room-6', type: 'bath',           x: 400, y: 260, width: 70,  height: 80,  color: '#0288d1', label: 'Shower Cabinet', floor: 0 },
+  { id: 'furn-13',roomId: 'room-8', type: 'table_coffee',   x: 160, y: 610, width: 90,  height: 60,  color: '#d4b483', label: 'Balcony Set',    floor: 0 },
 ];
 
 const AI_SUGGESTIONS = [
