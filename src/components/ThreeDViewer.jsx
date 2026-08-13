@@ -10,6 +10,21 @@ const WALL_H = 2.8;
 const WALL_T = 0.14;
 const FL_T = 0.06;
 
+function normalizeGroundPoints(ground) {
+  if (Array.isArray(ground.points) && ground.points.length >= 3)
+    return ground.points;
+  const x = ground.x ?? 0;
+  const y = ground.y ?? 0;
+  const width = ground.width ?? 0;
+  const height = ground.height ?? 0;
+  return [
+    { x, y },
+    { x: x + width, y },
+    { x: x + width, y: y + height },
+    { x, y: y + height },
+  ];
+}
+
 // ── Material presets ──────────────────────────────────────────
 const FLOOR_COLS = {
   living: "#c8a87a",
@@ -47,6 +62,34 @@ function Box({
         transparent={opacity < 1}
         opacity={opacity}
       />
+    </mesh>
+  );
+}
+
+function GroundPolygonMesh({ points }) {
+  const geometry = useMemo(() => {
+    const shape = new THREE.Shape();
+    points.forEach((p, i) => {
+      const x = p.x * SC;
+      const y = p.y * SC;
+      if (i === 0) shape.moveTo(x, y);
+      else shape.lineTo(x, y);
+    });
+    shape.closePath();
+    return new THREE.ExtrudeGeometry(shape, {
+      depth: 0.03,
+      bevelEnabled: false,
+    });
+  }, [points]);
+
+  return (
+    <mesh
+      geometry={geometry}
+      rotation={[Math.PI / 2, 0, 0]}
+      position={[0, 0.015, 0]}
+      receiveShadow
+    >
+      <meshStandardMaterial color="#86efac" roughness={0.85} metalness={0.02} />
     </mesh>
   );
 }
@@ -1033,33 +1076,35 @@ function Scene({ showRoof, timeOfDay }) {
     windowModes,
     toggleWindow,
   } = useDesignStore();
-  const visGround = grounds.find((g) => g.floor === activeFloor);
+  const visGrounds = grounds
+    .filter((g) => g.floor === activeFloor)
+    .map((g) => ({ ...g, points: normalizeGroundPoints(g) }));
   const vis = rooms.filter((r) => r.floor === activeFloor);
   const visFurn = furniture.filter((f) => f.floor === activeFloor);
 
-  if (!visGround) return null;
+  if (visGrounds.length === 0) return null;
 
   const { center, extent } = useMemo(() => {
-    if (!vis.length && !visGround) return { center: [0, 0, 0], extent: 5 };
-    const source = vis.length
-      ? vis.map((r) => ({ x: r.x, y: r.y, width: r.width, height: r.height }))
-      : [
-          {
-            x: visGround.x,
-            y: visGround.y,
-            width: visGround.width,
-            height: visGround.height,
-          },
-        ];
-    const minX = Math.min(...source.map((r) => r.x)) * SC;
-    const maxX = Math.max(...source.map((r) => r.x + r.width)) * SC;
-    const minZ = Math.min(...source.map((r) => r.y)) * SC;
-    const maxZ = Math.max(...source.map((r) => r.y + r.height)) * SC;
+    if (!vis.length && visGrounds.length === 0)
+      return { center: [0, 0, 0], extent: 5 };
+
+    const groundPoints = visGrounds.flatMap((g) => g.points);
+    const roomPoints = vis.flatMap((r) => [
+      { x: r.x, y: r.y },
+      { x: r.x + r.width, y: r.y },
+      { x: r.x + r.width, y: r.y + r.height },
+      { x: r.x, y: r.y + r.height },
+    ]);
+    const source = [...groundPoints, ...roomPoints];
+    const minX = Math.min(...source.map((p) => p.x)) * SC;
+    const maxX = Math.max(...source.map((p) => p.x)) * SC;
+    const minZ = Math.min(...source.map((p) => p.y)) * SC;
+    const maxZ = Math.max(...source.map((p) => p.y)) * SC;
     return {
       center: [(minX + maxX) / 2, 0, (minZ + maxZ) / 2],
       extent: Math.max(maxX - minX, maxZ - minZ),
     };
-  }, [vis, visGround]);
+  }, [vis, visGrounds]);
 
   const sunIntensity = 0.4 + timeOfDay * 1.2;
   const sunColor =
@@ -1099,25 +1144,9 @@ function Scene({ showRoof, timeOfDay }) {
       />
 
       {/* ── User-defined buildable ground footprint ── */}
-      {visGround && (
-        <mesh
-          position={[
-            visGround.x * SC + (visGround.width * SC) / 2,
-            0.015,
-            visGround.y * SC + (visGround.height * SC) / 2,
-          ]}
-          receiveShadow
-        >
-          <boxGeometry
-            args={[visGround.width * SC, 0.03, visGround.height * SC]}
-          />
-          <meshStandardMaterial
-            color="#86efac"
-            roughness={0.85}
-            metalness={0.02}
-          />
-        </mesh>
-      )}
+      {visGrounds.map((ground) => (
+        <GroundPolygonMesh key={ground.id} points={ground.points} />
+      ))}
 
       {/* ── Rooms ── */}
       {vis.map((room) => (
@@ -1167,29 +1196,31 @@ function Scene({ showRoof, timeOfDay }) {
 
 // ── Camera auto-position ──────────────────────────────────────
 function AutoCamera({ grounds, rooms, activeFloor }) {
-  const visGround = grounds.find((g) => g.floor === activeFloor);
+  const visGrounds = grounds
+    .filter((g) => g.floor === activeFloor)
+    .map((g) => ({ ...g, points: normalizeGroundPoints(g) }));
   const vis = rooms.filter((r) => r.floor === activeFloor);
   const { center, extent } = useMemo(() => {
-    if (!vis.length && !visGround) return { center: [0, 0, 0], extent: 6 };
-    const source = vis.length
-      ? vis.map((r) => ({ x: r.x, y: r.y, width: r.width, height: r.height }))
-      : [
-          {
-            x: visGround.x,
-            y: visGround.y,
-            width: visGround.width,
-            height: visGround.height,
-          },
-        ];
-    const minX = Math.min(...source.map((r) => r.x)) * SC;
-    const maxX = Math.max(...source.map((r) => r.x + r.width)) * SC;
-    const minZ = Math.min(...source.map((r) => r.y)) * SC;
-    const maxZ = Math.max(...source.map((r) => r.y + r.height)) * SC;
+    if (!vis.length && visGrounds.length === 0)
+      return { center: [0, 0, 0], extent: 6 };
+
+    const groundPoints = visGrounds.flatMap((g) => g.points);
+    const roomPoints = vis.flatMap((r) => [
+      { x: r.x, y: r.y },
+      { x: r.x + r.width, y: r.y },
+      { x: r.x + r.width, y: r.y + r.height },
+      { x: r.x, y: r.y + r.height },
+    ]);
+    const source = [...groundPoints, ...roomPoints];
+    const minX = Math.min(...source.map((p) => p.x)) * SC;
+    const maxX = Math.max(...source.map((p) => p.x)) * SC;
+    const minZ = Math.min(...source.map((p) => p.y)) * SC;
+    const maxZ = Math.max(...source.map((p) => p.y)) * SC;
     return {
       center: [(minX + maxX) / 2, 0, (minZ + maxZ) / 2],
       extent: Math.max(maxX - minX, maxZ - minZ),
     };
-  }, [vis, visGround]);
+  }, [vis, visGrounds]);
 
   const dist = extent * 1.4;
   const camPos = [center[0] + dist, dist * 1.1, center[2] + dist];

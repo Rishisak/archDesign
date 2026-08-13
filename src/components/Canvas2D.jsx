@@ -3,6 +3,51 @@ import { useDesignStore } from "../store/designStore";
 
 const WALL_THICKNESS = 10;
 
+function normalizeGroundPoints(ground) {
+  if (Array.isArray(ground.points) && ground.points.length >= 3)
+    return ground.points;
+  const x = ground.x ?? 0;
+  const y = ground.y ?? 0;
+  const width = ground.width ?? 0;
+  const height = ground.height ?? 0;
+  return [
+    { x, y },
+    { x: x + width, y },
+    { x: x + width, y: y + height },
+    { x, y: y + height },
+  ];
+}
+
+function polygonPath(points) {
+  if (!points.length) return "";
+  return `M ${points.map((p) => `${p.x} ${p.y}`).join(" L ")} Z`;
+}
+
+function polygonCentroid(points) {
+  if (!points.length) return { x: 0, y: 0 };
+  const sum = points.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), {
+    x: 0,
+    y: 0,
+  });
+  return { x: sum.x / points.length, y: sum.y / points.length };
+}
+
+function segmentLength(a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function polygonArea(points) {
+  if (points.length < 3) return 0;
+  let area = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    const j = (i + 1) % points.length;
+    area += points[i].x * points[j].y - points[j].x * points[i].y;
+  }
+  return Math.abs(area / 2);
+}
+
 function getOpeningTransform(room, side, position, width) {
   const hw = width / 2;
   switch (side) {
@@ -60,6 +105,16 @@ export default function Canvas2D() {
 
   const dragFurnRef = useRef(null);
   const dragRoomHandleRef = useRef(null);
+  const dragGroundVertexRef = useRef(null);
+  const [groundDraftPoints, setGroundDraftPoints] = useState([]);
+  const [selectedGroundIds, setSelectedGroundIds] = useState([]);
+  const [groundOrthoMode, setGroundOrthoMode] = useState(true);
+  const [groundScale, setGroundScale] = useState(100);
+
+  const toMeters = useCallback(
+    (canvasLength) => (canvasLength / 100) * (100 / groundScale),
+    [groundScale],
+  );
 
   const {
     grounds,
@@ -83,12 +138,15 @@ export default function Canvas2D() {
     updateRoom,
     deleteRoom,
     deleteFurniture,
-    deleteGroundForActiveFloor,
+    deleteGround,
     snap,
     addDoor,
     addWindow,
     addFurniture,
     updateFurniture,
+    addGroundPolygon,
+    updateGroundPolygon,
+    mergeGrounds,
     openDoors,
     toggleDoor,
     openWindows,
@@ -134,6 +192,15 @@ export default function Canvas2D() {
     setCentered(false);
   }, [activeFloor]);
 
+  useEffect(() => {
+    if (activeTool !== "ground") setGroundDraftPoints([]);
+  }, [activeTool]);
+
+  useEffect(() => {
+    setGroundDraftPoints([]);
+    setSelectedGroundIds([]);
+  }, [activeFloor]);
+
   // ── Coordinate transform ──────────────────────────────────
   const toWorld = useCallback((clientX, clientY) => {
     const rect = divRef.current?.getBoundingClientRect();
@@ -158,17 +225,28 @@ export default function Canvas2D() {
       }
       if (e.button !== 0) return;
       const w = toWorld(e.clientX, e.clientY);
-      const visGround = grounds.find((g) => g.floor === activeFloor);
+      const floorGrounds = grounds.filter((g) => g.floor === activeFloor);
       const visRooms = rooms.filter((r) => r.floor === activeFloor);
       const z = zoomRef.current;
 
       if (activeTool === "ground") {
-        startDrawing({ x: snap(w.x), y: snap(w.y) });
+        setGroundDraftPoints((prev) => {
+          let nx = snap(w.x);
+          let ny = snap(w.y);
+          if (groundOrthoMode && prev.length > 0) {
+            const last = prev[prev.length - 1];
+            const dx = nx - last.x;
+            const dy = ny - last.y;
+            if (Math.abs(dx) >= Math.abs(dy)) ny = last.y;
+            else nx = last.x;
+          }
+          return [...prev, { x: nx, y: ny }];
+        });
         return;
       }
 
       if (activeTool === "room") {
-        if (!visGround) return;
+        if (floorGrounds.length === 0) return;
         startDrawing({ x: snap(w.x), y: snap(w.y) });
         return;
       }
@@ -230,6 +308,7 @@ export default function Canvas2D() {
     [
       activeTool,
       rooms,
+      grounds,
       activeFloor,
       snap,
       startDrawing,
@@ -237,6 +316,7 @@ export default function Canvas2D() {
       addDoor,
       addWindow,
       toWorld,
+      groundOrthoMode,
     ],
   );
 
@@ -252,6 +332,16 @@ export default function Canvas2D() {
 
       const w = toWorld(e.clientX, e.clientY);
       setMousePos(w);
+
+      if (dragGroundVertexRef.current) {
+        const { groundId, pointIndex } = dragGroundVertexRef.current;
+        const target = grounds.find((g) => g.id === groundId);
+        if (!target) return;
+        const nextPoints = [...normalizeGroundPoints(target)];
+        nextPoints[pointIndex] = { x: snap(w.x), y: snap(w.y) };
+        updateGroundPolygon(groundId, nextPoints);
+        return;
+      }
 
       if (dragFurnRef.current) {
         const nx = snap(w.x - dragFurnRef.current.offsetX);
@@ -300,10 +390,23 @@ export default function Canvas2D() {
 
       if (isDrawingRoom) updateDrawing({ x: snap(w.x), y: snap(w.y) });
     },
-    [isDrawingRoom, toWorld, snap, updateDrawing, updateFurniture, updateRoom],
+    [
+      isDrawingRoom,
+      toWorld,
+      snap,
+      updateDrawing,
+      updateFurniture,
+      updateRoom,
+      grounds,
+      updateGroundPolygon,
+    ],
   );
 
   const onMouseUp = useCallback(() => {
+    if (dragGroundVertexRef.current) {
+      dragGroundVertexRef.current = null;
+      return;
+    }
     if (dragRoomHandleRef.current) {
       dragRoomHandleRef.current = null;
       return;
@@ -392,9 +495,33 @@ export default function Canvas2D() {
   // Keyboard
   useEffect(() => {
     const h = (e) => {
-      if (e.key === "Escape") cancelDrawing();
+      if (e.key === "Escape") {
+        cancelDrawing();
+        setGroundDraftPoints([]);
+      }
+
+      if (
+        e.key === "Enter" &&
+        activeTool === "ground" &&
+        groundDraftPoints.length >= 3
+      ) {
+        addGroundPolygon(groundDraftPoints);
+        setGroundDraftPoints([]);
+        setSelectedGroundIds([]);
+      }
+
+      if ((e.key === "m" || e.key === "M") && selectedGroundIds.length >= 2) {
+        mergeGrounds(selectedGroundIds);
+        setSelectedGroundIds([]);
+      }
+
       if ((e.key === "Delete" || e.key === "Backspace") && selectedId) {
-        if (selectedId.startsWith("ground-")) deleteGroundForActiveFloor();
+        if (selectedGroundIds.length > 0) {
+          selectedGroundIds.forEach((id) => deleteGround(id));
+          setSelectedGroundIds([]);
+          return;
+        }
+        if (selectedId.startsWith("ground-")) deleteGround(selectedId);
         deleteRoom(selectedId);
         deleteFurniture(selectedId);
       }
@@ -403,15 +530,22 @@ export default function Canvas2D() {
     return () => window.removeEventListener("keydown", h);
   }, [
     cancelDrawing,
+    activeTool,
+    groundDraftPoints,
+    addGroundPolygon,
+    selectedGroundIds,
+    mergeGrounds,
+    deleteGround,
     selectedId,
-    deleteGroundForActiveFloor,
     deleteRoom,
     deleteFurniture,
   ]);
 
   const z = localZoom;
   const pan = localPan;
-  const visGround = grounds.find((g) => g.floor === activeFloor);
+  const visGrounds = grounds
+    .filter((g) => g.floor === activeFloor)
+    .map((g) => ({ ...g, points: normalizeGroundPoints(g) }));
   const visRooms = rooms.filter((r) => r.floor === activeFloor);
   const visibleFurn = furniture.filter((f) => f.floor === activeFloor);
 
@@ -488,38 +622,126 @@ export default function Canvas2D() {
         </defs>
 
         <g transform={`translate(${pan.x},${pan.y}) scale(${z})`}>
-          {/* Ground footprint */}
-          {visGround && (
-            <g
-              onClick={(e) => {
-                e.stopPropagation();
-                if (activeTool === "select") setSelectedId(visGround.id);
-              }}
-              style={{
-                cursor: activeTool === "select" ? "pointer" : "default",
-              }}
-            >
-              <rect
-                x={visGround.x}
-                y={visGround.y}
-                width={visGround.width}
-                height={visGround.height}
-                fill="rgba(34,197,94,0.08)"
-                stroke={selectedId === visGround.id ? "#16a34a" : "#4b5563"}
-                strokeWidth={selectedId === visGround.id ? 3 / z : 1.5 / z}
-                strokeDasharray={`${8 / z} ${4 / z}`}
-                rx={2}
-              />
-              <text
-                x={visGround.x + 8 / z}
-                y={visGround.y - 10 / z}
-                fill="#16a34a"
-                fontSize={Math.max(8, 12 / z)}
-                fontFamily="Inter,sans-serif"
-                fontWeight="700"
+          {/* Ground footprints */}
+          {visGrounds.map((ground, gi) => {
+            const isSel =
+              selectedGroundIds.includes(ground.id) || selectedId === ground.id;
+            const c = polygonCentroid(ground.points);
+            return (
+              <g
+                key={ground.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (activeTool !== "select") return;
+                  if (e.shiftKey) {
+                    setSelectedGroundIds((prev) =>
+                      prev.includes(ground.id)
+                        ? prev.filter((id) => id !== ground.id)
+                        : [...prev, ground.id],
+                    );
+                  } else {
+                    setSelectedGroundIds([ground.id]);
+                  }
+                  setSelectedId(ground.id);
+                }}
+                style={{
+                  cursor: activeTool === "select" ? "pointer" : "default",
+                }}
               >
-                Ground Footprint
-              </text>
+                <path
+                  d={polygonPath(ground.points)}
+                  fill="rgba(34,197,94,0.10)"
+                  stroke={isSel ? "#16a34a" : "#4b5563"}
+                  strokeWidth={isSel ? 3 / z : 1.5 / z}
+                  strokeDasharray={`${8 / z} ${4 / z}`}
+                />
+                <text
+                  x={c.x}
+                  y={c.y}
+                  textAnchor="middle"
+                  fill="#166534"
+                  fontSize={Math.max(8, 11 / z)}
+                  fontFamily="Inter,sans-serif"
+                  fontWeight="700"
+                >
+                  Ground {gi + 1}
+                </text>
+
+                {isSel &&
+                  activeTool === "select" &&
+                  ground.points.map((p, i) => (
+                    <circle
+                      key={`${ground.id}-pt-${i}`}
+                      cx={p.x}
+                      cy={p.y}
+                      r={5 / z}
+                      fill="#ffffff"
+                      stroke="#16a34a"
+                      strokeWidth={2 / z}
+                      style={{ cursor: "move" }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        dragGroundVertexRef.current = {
+                          groundId: ground.id,
+                          pointIndex: i,
+                        };
+                      }}
+                    />
+                  ))}
+              </g>
+            );
+          })}
+
+          {activeTool === "ground" && groundDraftPoints.length > 0 && (
+            <g pointerEvents="none">
+              <polyline
+                points={groundDraftPoints.map((p) => `${p.x},${p.y}`).join(" ")}
+                fill="none"
+                stroke="#16a34a"
+                strokeWidth={2 / z}
+                strokeDasharray={`${6 / z} ${3 / z}`}
+              />
+              {groundDraftPoints.length >= 2 && (
+                <line
+                  x1={groundDraftPoints[groundDraftPoints.length - 1].x}
+                  y1={groundDraftPoints[groundDraftPoints.length - 1].y}
+                  x2={mousePos.x}
+                  y2={mousePos.y}
+                  stroke="#16a34a"
+                  strokeWidth={1.5 / z}
+                  strokeDasharray={`${4 / z} ${2 / z}`}
+                />
+              )}
+              {groundDraftPoints.map((p, i) => (
+                <circle
+                  key={`draft-${i}`}
+                  cx={p.x}
+                  cy={p.y}
+                  r={3.5 / z}
+                  fill="#16a34a"
+                />
+              ))}
+
+              {groundDraftPoints.slice(1).map((p, i) => {
+                const a = groundDraftPoints[i];
+                const len = toMeters(segmentLength(a, p));
+                const mx = (a.x + p.x) / 2;
+                const my = (a.y + p.y) / 2;
+                return (
+                  <text
+                    key={`seg-len-${i}`}
+                    x={mx}
+                    y={my - 8 / z}
+                    textAnchor="middle"
+                    fill="#14532d"
+                    fontSize={Math.max(7, 10 / z)}
+                    fontFamily="Inter,sans-serif"
+                    fontWeight="700"
+                  >
+                    {len.toFixed(2)} m
+                  </text>
+                );
+              })}
             </g>
           )}
 
@@ -1101,7 +1323,19 @@ export default function Canvas2D() {
         <span>|</span>
         <span>{visRooms.length} rooms</span>
         <span>|</span>
-        <span>{visGround ? "ground ready" : "no ground"}</span>
+        <span>{visGrounds.length} grounds</span>
+        {activeTool === "ground" && groundDraftPoints.length >= 3 && (
+          <>
+            <span>|</span>
+            <span style={{ color: "#16a34a", fontWeight: 600 }}>
+              Area:{" "}
+              {(
+                polygonArea(groundDraftPoints) * Math.pow(toMeters(1), 2)
+              ).toFixed(2)}{" "}
+              m²
+            </span>
+          </>
+        )}
         {isDrawingRoom && drawStart && drawCurrent && (
           <>
             <span>|</span>
@@ -1173,9 +1407,97 @@ export default function Canvas2D() {
         ))}
       </div>
 
+      {activeTool === "ground" && groundDraftPoints.length > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            top: 16,
+            right: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            zIndex: 8,
+          }}
+        >
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              background: "var(--bg-secondary)",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              padding: "5px 8px",
+              fontSize: 12,
+              color: "var(--text-secondary)",
+            }}
+          >
+            Scale
+            <select
+              value={groundScale}
+              onChange={(e) => setGroundScale(+e.target.value)}
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: 6,
+                background: "var(--bg-tertiary)",
+                color: "var(--text-primary)",
+                fontSize: 12,
+                padding: "2px 6px",
+              }}
+            >
+              <option value={50}>1:50</option>
+              <option value={100}>1:100</option>
+              <option value={200}>1:200</option>
+            </select>
+          </label>
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              background: "var(--bg-secondary)",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              padding: "5px 8px",
+              fontSize: 12,
+              color: "var(--text-secondary)",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={groundOrthoMode}
+              onChange={(e) => setGroundOrthoMode(e.target.checked)}
+            />
+            Perpendicular
+          </label>
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              if (groundDraftPoints.length < 3) {
+                alert("Add at least 3 points to create a ground polygon.");
+                return;
+              }
+              addGroundPolygon(groundDraftPoints);
+              setGroundDraftPoints([]);
+            }}
+          >
+            Finish Ground
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setGroundDraftPoints([])}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
       {/* Tool hint banners */}
       {activeTool === "ground" && (
-        <ToolHint>Click and drag to draw the buildable ground area</ToolHint>
+        <ToolHint>
+          Click to add points · Perpendicular mode keeps edges orthogonal ·
+          Press <b>Enter</b> to finish
+        </ToolHint>
       )}
       {activeTool === "room" && (
         <ToolHint>
@@ -1193,9 +1515,15 @@ export default function Canvas2D() {
           Click on canvas to place furniture, or use Library panel →
         </ToolHint>
       )}
+      {activeTool === "select" && selectedGroundIds.length >= 2 && (
+        <ToolHint>
+          <b>{selectedGroundIds.length}</b> grounds selected · Press <b>M</b> to
+          merge
+        </ToolHint>
+      )}
 
       {/* Empty state */}
-      {!visGround && !isDrawingRoom && (
+      {visGrounds.length === 0 && !isDrawingRoom && (
         <div
           style={{
             position: "absolute",
@@ -1232,7 +1560,7 @@ export default function Canvas2D() {
         </div>
       )}
 
-      {visGround && visRooms.length === 0 && !isDrawingRoom && (
+      {visGrounds.length > 0 && visRooms.length === 0 && !isDrawingRoom && (
         <div
           style={{
             position: "absolute",

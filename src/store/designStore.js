@@ -5,6 +5,95 @@ let nextId = 100;
 const genId = (prefix = "el") =>
   `${prefix}-${nextId++}-${Math.random().toString(36).slice(2, 6)}`;
 
+function rectToPoints(g) {
+  const x = g.x ?? 0;
+  const y = g.y ?? 0;
+  const w = g.width ?? 0;
+  const h = g.height ?? 0;
+  return [
+    { x, y },
+    { x: x + w, y },
+    { x: x + w, y: y + h },
+    { x, y: y + h },
+  ];
+}
+
+function normalizeGround(g) {
+  if (Array.isArray(g.points) && g.points.length >= 3) {
+    return {
+      ...g,
+      points: g.points.map((p) => ({ x: +p.x, y: +p.y })),
+    };
+  }
+  return {
+    ...g,
+    points: rectToPoints(g),
+  };
+}
+
+function pointInPolygon(point, polygon) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x;
+    const yi = polygon[i].y;
+    const xj = polygon[j].x;
+    const yj = polygon[j].y;
+    const intersect =
+      yi > point.y !== yj > point.y &&
+      point.x < ((xj - xi) * (point.y - yi)) / (yj - yi || 1e-9) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function rectInsideAnyGround(x, y, width, height, grounds) {
+  const corners = [
+    { x, y },
+    { x: x + width, y },
+    { x: x + width, y: y + height },
+    { x, y: y + height },
+  ];
+  return corners.every((corner) =>
+    grounds.some((g) => pointInPolygon(corner, g.points)),
+  );
+}
+
+function convexHull(points) {
+  if (points.length < 3) return points;
+  const sorted = [...points].sort((a, b) =>
+    a.x === b.x ? a.y - b.y : a.x - b.x,
+  );
+  const cross = (o, a, b) =>
+    (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+
+  const lower = [];
+  for (const p of sorted) {
+    while (
+      lower.length >= 2 &&
+      cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0
+    ) {
+      lower.pop();
+    }
+    lower.push(p);
+  }
+
+  const upper = [];
+  for (let i = sorted.length - 1; i >= 0; i -= 1) {
+    const p = sorted[i];
+    while (
+      upper.length >= 2 &&
+      cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0
+    ) {
+      upper.pop();
+    }
+    upper.push(p);
+  }
+
+  upper.pop();
+  lower.pop();
+  return [...lower, ...upper];
+}
+
 // ─── Default rooms & furniture for demo apartment (Image 5) ─────────
 const DEFAULT_ROOMS = [
   {
@@ -447,32 +536,54 @@ export const useDesignStore = create(
       })),
 
     // Ground footprint CRUD
-    upsertGroundForActiveFloor: (ground) =>
+    addGroundPolygon: (points) =>
+      set((s) => ({
+        grounds: [
+          ...s.grounds,
+          normalizeGround({
+            id: genId("ground"),
+            name: `Ground ${s.grounds.filter((g) => g.floor === s.activeFloor).length + 1}`,
+            floor: s.activeFloor,
+            points,
+          }),
+        ],
+        groundPreviewed3D: { ...s.groundPreviewed3D, [s.activeFloor]: false },
+      })),
+    updateGroundPolygon: (id, points) =>
+      set((s) => ({
+        grounds: s.grounds.map((g) =>
+          g.id === id ? normalizeGround({ ...g, points }) : g,
+        ),
+        groundPreviewed3D: { ...s.groundPreviewed3D, [s.activeFloor]: false },
+      })),
+    deleteGround: (id) =>
+      set((s) => ({
+        grounds: s.grounds.filter((g) => g.id !== id),
+        selectedId: s.selectedId === id ? null : s.selectedId,
+      })),
+    mergeGrounds: (groundIds) =>
       set((s) => {
-        const nextGround = {
-          id: genId("ground"),
-          name: "Ground Footprint",
-          floor: s.activeFloor,
-          ...ground,
-        };
-        const hasForFloor = s.grounds.some((g) => g.floor === s.activeFloor);
+        const selected = s.grounds.filter(
+          (g) => groundIds.includes(g.id) && g.floor === s.activeFloor,
+        );
+        if (selected.length < 2) return {};
+        const allPoints = selected.flatMap((g) => normalizeGround(g).points);
+        const mergedPoints = convexHull(allPoints);
+        const mergedId = genId("ground");
         return {
-          grounds: hasForFloor
-            ? s.grounds.map((g) =>
-                g.floor === s.activeFloor ? { ...g, ...nextGround } : g,
-              )
-            : [...s.grounds, nextGround],
+          grounds: [
+            ...s.grounds.filter((g) => !groundIds.includes(g.id)),
+            {
+              id: mergedId,
+              name: "Merged Ground",
+              floor: s.activeFloor,
+              points: mergedPoints,
+            },
+          ],
+          selectedId: mergedId,
           groundPreviewed3D: { ...s.groundPreviewed3D, [s.activeFloor]: false },
         };
       }),
-    deleteGroundForActiveFloor: () =>
-      set((s) => ({
-        grounds: s.grounds.filter((g) => g.floor !== s.activeFloor),
-        selectedId:
-          s.selectedId && s.selectedId.startsWith("ground-")
-            ? null
-            : s.selectedId,
-      })),
 
     // Room Extending & Merging
     extendRoom: (id, dir, delta = 40) =>
@@ -583,7 +694,7 @@ export const useDesignStore = create(
         if (!data.rooms || !Array.isArray(data.rooms))
           throw new Error("Invalid project file format.");
         set({
-          grounds: data.grounds || [],
+          grounds: (data.grounds || []).map(normalizeGround),
           rooms: data.rooms || [],
           doors: data.doors || [],
           windows: data.windows || [],
@@ -705,7 +816,6 @@ export const useDesignStore = create(
         activeTool,
         activeFloor,
         grounds,
-        upsertGroundForActiveFloor,
         groundPreviewed3D,
       } = get();
       if (!drawStart || !drawCurrent) return;
@@ -714,29 +824,16 @@ export const useDesignStore = create(
       const width = Math.abs(snap(drawCurrent.x - drawStart.x));
       const height = Math.abs(snap(drawCurrent.y - drawStart.y));
 
-      if (width > 40 && height > 40 && activeTool === "ground") {
-        upsertGroundForActiveFloor({ x, y, width, height });
-        set({
-          isDrawingRoom: false,
-          drawStart: null,
-          drawCurrent: null,
-          activeTool: "select",
-        });
-        return;
-      }
-
       if (width > 40 && height > 40 && activeTool === "room") {
-        const ground = grounds.find((g) => g.floor === activeFloor);
-        if (!ground) {
+        const floorGrounds = grounds
+          .filter((g) => g.floor === activeFloor)
+          .map(normalizeGround);
+        if (floorGrounds.length === 0) {
           alert("Draw a ground footprint first.");
         } else if (!groundPreviewed3D[activeFloor]) {
           alert("Preview your ground in 3D View before creating rooms.");
         } else {
-          const inside =
-            x >= ground.x &&
-            y >= ground.y &&
-            x + width <= ground.x + ground.width &&
-            y + height <= ground.y + ground.height;
+          const inside = rectInsideAnyGround(x, y, width, height, floorGrounds);
           if (!inside) {
             alert("Room must stay inside the ground footprint.");
           } else {
@@ -781,7 +878,7 @@ export const useDesignStore = create(
         windows: DEFAULT_WINDOWS,
         furniture: DEFAULT_FURNITURE,
         aiSuggestions: AI_SUGGESTIONS,
-        groundPreviewed3D: { 0: true },
+        groundPreviewed3D: {},
       }),
   })),
 );
