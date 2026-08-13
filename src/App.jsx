@@ -4,7 +4,7 @@ import { useDesignStore } from './store/designStore';
 import Header from './components/Header';
 import Toolbar from './components/Toolbar';
 import Canvas2D from './components/Canvas2D';
-import RightPanel from './components/RightPanel';
+import RightPanel, { FurniturePropertiesPanel } from './components/RightPanel';
 
 const ThreeDViewer      = React.lazy(() => import('./components/ThreeDViewer'));
 const WalkthroughViewer = React.lazy(() => import('./components/WalkthroughViewer'));
@@ -51,6 +51,8 @@ export default function App() {
             pointerEvents: is2D ? 'auto' : 'none',
           }}>
             <Canvas2D />
+            {/* Furniture Properties side panel — overlays from right */}
+            <FurniturePropertiesPanel />
           </div>
 
           {viewMode === '3d' && (

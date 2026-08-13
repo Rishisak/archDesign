@@ -47,6 +47,63 @@ export const LIBRARY_ITEMS = [
     h: 20,
     color: "#c8923a",
   },
+  {
+    category: "doors",
+    icon: "🚪",
+    name: "Sliding Door",
+    type: "door_sliding",
+    w: 120,
+    h: 20,
+    color: "#b07a30",
+  },
+  {
+    category: "doors",
+    icon: "🚪",
+    name: "Folding Door",
+    type: "door_folding",
+    w: 100,
+    h: 20,
+    color: "#a06828",
+  },
+
+  // ── Windows ──
+  {
+    category: "windows",
+    icon: "🪟",
+    name: "Single Window",
+    type: "window_single",
+    w: 80,
+    h: 15,
+    color: "#64b5f6",
+  },
+  {
+    category: "windows",
+    icon: "🪟",
+    name: "Double Window",
+    type: "window_double",
+    w: 140,
+    h: 15,
+    color: "#42a5f5",
+  },
+  {
+    category: "windows",
+    icon: "🪟",
+    name: "Bay Window",
+    type: "window_bay",
+    w: 160,
+    h: 40,
+    color: "#1e88e5",
+  },
+  {
+    category: "windows",
+    icon: "🪟",
+    name: "Sliding Window",
+    type: "window_sliding",
+    w: 120,
+    h: 15,
+    color: "#2196f3",
+  },
+
 
   // ── Seating ──
   {
@@ -528,8 +585,12 @@ function RoomsPanel() {
                 type="number"
                 value={selFurn.width}
                 onChange={(e) =>
-                  updateFurniture(selFurn.id, { width: +e.target.value })
+                  e.target.value !== "" && updateFurniture(selFurn.id, { width: +e.target.value })
                 }
+                onBlur={(e) => {
+                  const v = +e.target.value;
+                  if (!isNaN(v) && v > 0) updateFurniture(selFurn.id, { width: v });
+                }}
               />
             </div>
             <div className="prop-group">
@@ -539,8 +600,12 @@ function RoomsPanel() {
                 type="number"
                 value={selFurn.height}
                 onChange={(e) =>
-                  updateFurniture(selFurn.id, { height: +e.target.value })
+                  e.target.value !== "" && updateFurniture(selFurn.id, { height: +e.target.value })
                 }
+                onBlur={(e) => {
+                  const v = +e.target.value;
+                  if (!isNaN(v) && v > 0) updateFurniture(selFurn.id, { height: v });
+                }}
               />
             </div>
           </div>
@@ -813,7 +878,8 @@ function LibraryPanel() {
 
   const categories = [
     { id: "all", label: "All" },
-    { id: "doors", label: "Doors" },
+    { id: "doors", label: "🚪 Doors" },
+    { id: "windows", label: "🪟 Windows" },
     { id: "seating", label: "Seating" },
     { id: "beds", label: "Beds" },
     { id: "tables", label: "Tables" },
@@ -968,6 +1034,433 @@ function ThemePanel() {
 }
 
 const TABS = ["Rooms", "AI Copilot", "Library", "Theme"];
+
+// ─── Furniture colour presets ────────────────────────────────────────────────
+const FURN_COLORS = [
+  "#546e7a", "#37474f", "#78909c", "#4e342e", "#6d4c41",
+  "#8e24aa", "#ab47bc", "#1e88e5", "#42a5f5", "#2e7d32",
+  "#c8923a", "#e53935", "#f9a825", "#00897b", "#212121",
+  "#d4b483", "#ffffff", "#f5f5f5", "#b0bec5", "#607d8b",
+];
+
+// ─── Exported Furniture Properties Panel ─────────────────────────────────────
+export function FurniturePropertiesPanel() {
+  const {
+    furniture,
+    selectedId,
+    setSelectedId,
+    updateFurniture,
+    deleteFurniture,
+    addFurniture,
+    viewMode,
+  } = useDesignStore();
+
+  const selFurn = furniture.find((f) => f.id === selectedId);
+
+  // Local editable strings for size — so user can clear and retype freely
+  const [wStr, setWStr] = React.useState("");
+  const [hStr, setHStr] = React.useState("");
+
+  // Sync local strings when a new item is selected
+  React.useEffect(() => {
+    if (selFurn) {
+      setWStr(String(selFurn.width ?? ""));
+      setHStr(String(selFurn.height ?? ""));
+    }
+  }, [selFurn?.id]); // only reset when the selected item changes
+
+  // Only show in 2D mode when a furniture item is selected
+  if (viewMode !== "2d" || !selFurn) return null;
+
+  const rot = selFurn.rotation ?? 0;
+  const opacity = selFurn.opacity ?? 1;
+  const flipH = selFurn.flipH ?? false;
+
+  const update = (patch) => updateFurniture(selFurn.id, patch);
+
+  const commitWidth = () => {
+    const v = parseFloat(wStr);
+    if (!isNaN(v) && v > 0) update({ width: v });
+    else setWStr(String(selFurn.width)); // revert if invalid
+  };
+
+  const commitHeight = () => {
+    const v = parseFloat(hStr);
+    if (!isNaN(v) && v > 0) update({ height: v });
+    else setHStr(String(selFurn.height)); // revert if invalid
+  };
+
+  const handleDuplicate = () => {
+    addFurniture({
+      ...selFurn,
+      id: undefined,
+      x: (selFurn.x ?? 0) + 30,
+      y: (selFurn.y ?? 0) + 30,
+    });
+  };
+
+  // Icon based on type prefix
+  const typeIcon = selFurn.type?.startsWith("door")
+    ? "🚪"
+    : selFurn.type?.startsWith("window")
+    ? "🪟"
+    : selFurn.type?.startsWith("bed")
+    ? "🛏️"
+    : selFurn.type?.startsWith("sofa") || selFurn.type === "armchair"
+    ? "🛋️"
+    : selFurn.type?.startsWith("dining") || selFurn.type?.startsWith("table") || selFurn.type === "desk" || selFurn.type === "nightstand"
+    ? "🪑"
+    : "📦";
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        right: 0,
+        top: 0,
+        bottom: 0,
+        width: 260,
+        background: "var(--bg-secondary)",
+        borderLeft: "1px solid var(--border)",
+        display: "flex",
+        flexDirection: "column",
+        zIndex: 200,
+        boxShadow: "-8px 0 32px rgba(0,0,0,0.35)",
+        animation: "slideInRight 0.22s cubic-bezier(0.22,1,0.36,1)",
+        overflowY: "auto",
+        overflowX: "hidden",
+      }}
+    >
+      {/* ── Header ── */}
+      <div
+        style={{
+          padding: "14px 14px 10px",
+          borderBottom: "1px solid var(--border)",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          flexShrink: 0,
+          background: "var(--bg-secondary)",
+          position: "sticky",
+          top: 0,
+          zIndex: 1,
+        }}
+      >
+        <span style={{ fontSize: 20 }}>{typeIcon}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: "var(--accent)",
+              textTransform: "uppercase",
+              letterSpacing: "0.07em",
+            }}
+          >
+            Properties
+          </div>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--text-primary)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {selFurn.label}
+          </div>
+        </div>
+        <button
+          onClick={() => setSelectedId(null)}
+          style={{
+            background: "var(--bg-tertiary)",
+            border: "1px solid var(--border)",
+            borderRadius: 6,
+            width: 26,
+            height: 26,
+            cursor: "pointer",
+            color: "var(--text-muted)",
+            fontSize: 13,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+          title="Close panel"
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* ── Body ── */}
+      <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 14 }}>
+
+        {/* Label */}
+        <div>
+          <div className="prop-label" style={{ marginBottom: 4 }}>Label / Name</div>
+          <input
+            className="prop-input"
+            value={selFurn.label}
+            onChange={(e) => update({ label: e.target.value })}
+            style={{ width: "100%", boxSizing: "border-box" }}
+          />
+        </div>
+
+        {/* Size */}
+        <div>
+          <div className="prop-label" style={{ marginBottom: 6 }}>📐 Size (cm)</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div>
+              <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 3 }}>Width</div>
+              <input
+                className="prop-input"
+                type="number"
+                value={wStr}
+                onChange={(e) => setWStr(e.target.value)}
+                onBlur={commitWidth}
+                onKeyDown={(e) => e.key === "Enter" && commitWidth()}
+                style={{ width: "100%", boxSizing: "border-box" }}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 3 }}>Depth</div>
+              <input
+                className="prop-input"
+                type="number"
+                value={hStr}
+                onChange={(e) => setHStr(e.target.value)}
+                onBlur={commitHeight}
+                onKeyDown={(e) => e.key === "Enter" && commitHeight()}
+                style={{ width: "100%", boxSizing: "border-box" }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Rotation */}
+        <div>
+          <div className="prop-label" style={{ marginBottom: 6 }}>🔄 Rotation</div>
+          <input
+            type="range"
+            min={0}
+            max={360}
+            step={1}
+            value={rot}
+            onChange={(e) => update({ rotation: +e.target.value })}
+            style={{ width: "100%", accentColor: "var(--accent)", marginBottom: 6 }}
+          />
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <button
+              onClick={() => update({ rotation: ((rot - 90) + 360) % 360 })}
+              style={{
+                flex: 1, padding: "5px 4px", fontSize: 11,
+                background: "var(--bg-tertiary)", border: "1px solid var(--border)",
+                borderRadius: 6, cursor: "pointer", color: "var(--text-primary)",
+              }}
+              title="Rotate -90°"
+            >↺ -90°</button>
+            <div
+              style={{
+                flex: 1, textAlign: "center", fontSize: 13, fontWeight: 700,
+                color: "var(--accent)",
+              }}
+            >
+              {rot}°
+            </div>
+            <button
+              onClick={() => update({ rotation: (rot + 90) % 360 })}
+              style={{
+                flex: 1, padding: "5px 4px", fontSize: 11,
+                background: "var(--bg-tertiary)", border: "1px solid var(--border)",
+                borderRadius: 6, cursor: "pointer", color: "var(--text-primary)",
+              }}
+              title="Rotate +90°"
+            >↻ +90°</button>
+          </div>
+        </div>
+
+        {/* Color */}
+        <div>
+          <div className="prop-label" style={{ marginBottom: 6 }}>🎨 Color</div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(5, 1fr)",
+              gap: 5,
+              marginBottom: 8,
+            }}
+          >
+            {FURN_COLORS.map((c) => (
+              <button
+                key={c}
+                onClick={() => update({ color: c })}
+                title={c}
+                style={{
+                  width: "100%",
+                  aspectRatio: "1",
+                  borderRadius: 6,
+                  background: c,
+                  border: selFurn.color === c
+                    ? "2.5px solid var(--accent)"
+                    : "1.5px solid var(--border)",
+                  cursor: "pointer",
+                  boxShadow: selFurn.color === c ? "0 0 0 2px var(--accent)" : "none",
+                  transition: "transform 0.1s",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.15)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              />
+            ))}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <label style={{ fontSize: 11, color: "var(--text-muted)", flexShrink: 0 }}>Custom</label>
+            <input
+              type="color"
+              value={selFurn.color || "#546e7a"}
+              onChange={(e) => update({ color: e.target.value })}
+              style={{
+                width: 36, height: 28, padding: 0, border: "1px solid var(--border)",
+                borderRadius: 6, cursor: "pointer", background: "none",
+                flexShrink: 0,
+              }}
+            />
+            <input
+              className="prop-input"
+              value={selFurn.color || ""}
+              onChange={(e) => update({ color: e.target.value })}
+              placeholder="#hex"
+              style={{ flex: 1, fontFamily: "monospace", fontSize: 12, boxSizing: "border-box" }}
+            />
+          </div>
+        </div>
+
+        {/* Opacity */}
+        <div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 6,
+            }}
+          >
+            <div className="prop-label">💧 Opacity</div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)" }}>
+              {Math.round(opacity * 100)}%
+            </span>
+          </div>
+          <input
+            type="range"
+            min={0.1}
+            max={1}
+            step={0.05}
+            value={opacity}
+            onChange={(e) => update({ opacity: +e.target.value })}
+            style={{ width: "100%", accentColor: "var(--accent)" }}
+          />
+        </div>
+
+        {/* Flip */}
+        <div>
+          <div className="prop-label" style={{ marginBottom: 6 }}>↔ Transform</div>
+          <button
+            onClick={() => update({ flipH: !flipH })}
+            style={{
+              width: "100%",
+              padding: "7px",
+              fontSize: 12,
+              borderRadius: 8,
+              border: `1.5px solid ${flipH ? "var(--accent)" : "var(--border)"}`,
+              background: flipH ? "rgba(99,102,241,0.15)" : "var(--bg-tertiary)",
+              color: flipH ? "var(--accent)" : "var(--text-primary)",
+              cursor: "pointer",
+              fontWeight: flipH ? 700 : 400,
+              transition: "all 0.15s",
+            }}
+          >
+            {flipH ? "↔ Flip ON" : "↔ Flip Horizontal"}
+          </button>
+        </div>
+
+        {/* Position (read-only info) */}
+        <div
+          style={{
+            padding: "8px 10px",
+            background: "var(--bg-tertiary)",
+            borderRadius: 8,
+            border: "1px solid var(--border)",
+            fontSize: 11,
+            color: "var(--text-muted)",
+            display: "flex",
+            gap: 12,
+          }}
+        >
+          <span>📍 X: <strong style={{ color: "var(--text-secondary)" }}>{Math.round(selFurn.x ?? 0)}</strong></span>
+          <span>Y: <strong style={{ color: "var(--text-secondary)" }}>{Math.round(selFurn.y ?? 0)}</strong></span>
+          <span>Type: <strong style={{ color: "var(--text-secondary)", textTransform: "capitalize" }}>{(selFurn.type ?? "").replace(/_/g, " ")}</strong></span>
+        </div>
+
+        {/* Divider */}
+        <div style={{ height: 1, background: "var(--border)" }} />
+
+        {/* Actions */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+          <button
+            onClick={handleDuplicate}
+            style={{
+              width: "100%",
+              padding: "8px",
+              fontSize: 12,
+              fontWeight: 600,
+              borderRadius: 8,
+              border: "1.5px solid var(--border)",
+              background: "var(--bg-tertiary)",
+              color: "var(--text-primary)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "var(--bg-tertiary)")}
+          >
+            ⧉ Duplicate Item
+          </button>
+          <button
+            onClick={() => {
+              deleteFurniture(selFurn.id);
+              setSelectedId(null);
+            }}
+            style={{
+              width: "100%",
+              padding: "8px",
+              fontSize: 12,
+              fontWeight: 600,
+              borderRadius: 8,
+              border: "1.5px solid #ef444455",
+              background: "rgba(239,68,68,0.1)",
+              color: "#f87171",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(239,68,68,0.2)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(239,68,68,0.1)")}
+          >
+            🗑 Delete Item
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function RightPanel() {
   return null;

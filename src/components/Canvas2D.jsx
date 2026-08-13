@@ -516,6 +516,11 @@ export default function Canvas2D() {
       }
 
       if ((e.key === "Delete" || e.key === "Backspace") && selectedId) {
+        // Don't intercept when user is typing inside an input / textarea / select
+        const tag = document.activeElement?.tagName?.toLowerCase();
+        const isEditable = document.activeElement?.isContentEditable;
+        if (tag === "input" || tag === "textarea" || tag === "select" || isEditable) return;
+
         if (selectedGroundIds.length > 0) {
           selectedGroundIds.forEach((id) => deleteGround(id));
           setSelectedGroundIds([]);
