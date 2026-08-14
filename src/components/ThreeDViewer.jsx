@@ -1196,14 +1196,34 @@ function getWindowPos(x, z, rw, rd, win) {
   }
 }
 
+// ── Per-storey vertical offset: wall height + inter-floor slab ──────────────
+const STOREY_H = WALL_H + 0.15; // ~2.95 m per floor
+
+// ── Renders one floor's content offset by its storey index ────────────────
+function FloorGroup({ floorIndex, showRoof, children }) {
+  const yOffset = floorIndex * STOREY_H;
+  return (
+    <group position={[0, yOffset, 0]}>
+      {children}
+      {/* Inter-floor concrete slab (visible in all-floors mode) */}
+      {floorIndex > 0 && (
+        <group position={[0, -0.15, 0]}>
+          {/* slab rendered by parent via visGrounds */}
+        </group>
+      )}
+    </group>
+  );
+}
+
 // ── Entire scene ──────────────────────────────────────────────
-function Scene({ showRoof, timeOfDay }) {
+function Scene({ showRoof, timeOfDay, showAllFloors }) {
   const {
     grounds,
     rooms,
     doors,
     windows,
     furniture,
+    floors,
     activeFloor,
     openDoors,
     toggleDoor,
@@ -1211,35 +1231,51 @@ function Scene({ showRoof, timeOfDay }) {
     windowModes,
     toggleWindow,
   } = useDesignStore();
-  const visGrounds = grounds
-    .filter((g) => g.floor === activeFloor)
-    .map((g) => ({ ...g, points: normalizeGroundPoints(g) }));
-  const vis = rooms.filter((r) => r.floor === activeFloor);
-  const visFurn = furniture.filter((f) => f.floor === activeFloor);
 
-  if (visGrounds.length === 0) return null;
+  // Which floor IDs to render
+  const visFloorIds = showAllFloors
+    ? floors.map((f) => f.id)
+    : [activeFloor];
+
+  // Ground footprints for visible floors
+  const allVisGrounds = useMemo(
+    () =>
+      grounds
+        .filter((g) => visFloorIds.includes(g.floor))
+        .map((g) => ({ ...g, points: normalizeGroundPoints(g) })),
+    [grounds, visFloorIds],
+  );
+
+  // Bounding box for camera / lighting (use ALL visible rooms + grounds)
+  const allVisRooms = useMemo(
+    () => rooms.filter((r) => visFloorIds.includes(r.floor)),
+    [rooms, visFloorIds],
+  );
 
   const { center, extent } = useMemo(() => {
-    if (!vis.length && visGrounds.length === 0)
-      return { center: [0, 0, 0], extent: 5 };
-
-    const groundPoints = visGrounds.flatMap((g) => g.points);
-    const roomPoints = vis.flatMap((r) => [
-      { x: r.x, y: r.y },
-      { x: r.x + r.width, y: r.y },
-      { x: r.x + r.width, y: r.y + r.height },
-      { x: r.x, y: r.y + r.height },
-    ]);
-    const source = [...groundPoints, ...roomPoints];
+    const source = [
+      ...allVisGrounds.flatMap((g) => g.points),
+      ...allVisRooms.flatMap((r) => [
+        { x: r.x, y: r.y },
+        { x: r.x + r.width, y: r.y },
+        { x: r.x + r.width, y: r.y + r.height },
+        { x: r.x, y: r.y + r.height },
+      ]),
+    ];
+    if (source.length === 0) return { center: [0, 0, 0], extent: 5 };
     const minX = Math.min(...source.map((p) => p.x)) * SC;
     const maxX = Math.max(...source.map((p) => p.x)) * SC;
     const minZ = Math.min(...source.map((p) => p.y)) * SC;
     const maxZ = Math.max(...source.map((p) => p.y)) * SC;
+    const totalH = visFloorIds.length * STOREY_H;
     return {
-      center: [(minX + maxX) / 2, 0, (minZ + maxZ) / 2],
+      center: [(minX + maxX) / 2, totalH / 2, (minZ + maxZ) / 2],
       extent: Math.max(maxX - minX, maxZ - minZ),
     };
-  }, [vis, visGrounds]);
+  }, [allVisGrounds, allVisRooms, visFloorIds]);
+
+  // At least one ground needed
+  if (allVisGrounds.length === 0) return null;
 
   const sunIntensity = 0.4 + timeOfDay * 1.2;
   const sunColor =
@@ -1251,90 +1287,132 @@ function Scene({ showRoof, timeOfDay }) {
       {/* ── Lighting ── */}
       <ambientLight intensity={0.55} color={ambColor} />
       <directionalLight
-        position={[center[0] + 12, 16, center[2] + 8]}
+        position={[center[0] + 12, center[1] + 16, center[2] + 8]}
         intensity={sunIntensity}
         color={sunColor}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
         shadow-camera-near={0.5}
-        shadow-camera-far={60}
-        shadow-camera-left={-20}
-        shadow-camera-right={20}
-        shadow-camera-top={20}
-        shadow-camera-bottom={-20}
+        shadow-camera-far={80}
+        shadow-camera-left={-25}
+        shadow-camera-right={25}
+        shadow-camera-top={25}
+        shadow-camera-bottom={-25}
         shadow-bias={-0.001}
       />
-      {/* Fill light from opposite side */}
       <directionalLight
-        position={[center[0] - 8, 6, center[2] - 6]}
+        position={[center[0] - 8, center[1] + 6, center[2] - 6]}
         intensity={0.25}
         color="#d0e4ff"
       />
-      {/* Hemisphere */}
       <hemisphereLight
         skyColor="#fff8f0"
         groundColor="#806040"
         intensity={0.3}
       />
 
-      {/* ── User-defined buildable ground footprint ── */}
-      {visGrounds.map((ground) => (
-        <GroundPolygonMesh key={ground.id} points={ground.points} />
-      ))}
+      {/* ── Render each visible floor ── */}
+      {visFloorIds.map((floorId, floorIdx) => {
+        const yOff = floorIdx * STOREY_H;
+        const floorGrounds = allVisGrounds.filter((g) => g.floor === floorId);
+        const floorRooms = rooms.filter((r) => r.floor === floorId);
+        const floorFurn = furniture.filter((f) => f.floor === floorId);
 
-      {/* ── Rooms ── */}
-      {vis.map((room) => (
-        <Room
-          key={room.id}
-          room={room}
-          allDoors={doors}
-          allWindows={windows}
-          openDoors={openDoors}
-          openWindows={openWindows}
-          windowModes={windowModes}
-          toggleDoor={toggleDoor}
-          toggleWindow={toggleWindow}
-        />
-      ))}
+        return (
+          <group key={`floor-${floorId}`} position={[0, yOff, 0]}>
+            {/* ── Inter-floor structural slab (above ground floor) ── */}
+            {floorIdx > 0 &&
+              floorGrounds.map((g) => {
+                // Thin concrete slab at the base of each upper floor
+                const pts = g.points;
+                const minX = Math.min(...pts.map((p) => p.x)) * SC;
+                const maxX = Math.max(...pts.map((p) => p.x)) * SC;
+                const minZ = Math.min(...pts.map((p) => p.y)) * SC;
+                const maxZ = Math.max(...pts.map((p) => p.y)) * SC;
+                return (
+                  <mesh
+                    key={`slab-${g.id}`}
+                    position={[
+                      (minX + maxX) / 2,
+                      -0.08,
+                      (minZ + maxZ) / 2,
+                    ]}
+                    receiveShadow
+                  >
+                    <boxGeometry args={[maxX - minX, 0.16, maxZ - minZ]} />
+                    <meshStandardMaterial
+                      color="#c8c0b8"
+                      roughness={0.9}
+                      metalness={0.02}
+                    />
+                  </mesh>
+                );
+              })}
 
-      {/* ── User Placed Furniture ── */}
-      {visFurn.map((f) => (
-        <Furniture3D key={f.id} item={f} />
-      ))}
+            {/* Ground footprint polygon */}
+            {floorGrounds.map((ground) => (
+              <GroundPolygonMesh key={ground.id} points={ground.points} />
+            ))}
 
-      {/* ── Roof slabs (optional, translucent when shown) ── */}
-      {!showRoof &&
-        vis.map((room) => {
-          const x = room.x * SC,
-            z = room.y * SC;
-          const rw = room.width * SC,
-            rd = room.height * SC;
-          return (
-            <mesh
-              key={`roof-${room.id}`}
-              position={[x + rw / 2, WALL_H + 0.04, z + rd / 2]}
-            >
-              <boxGeometry args={[rw, 0.08, rd]} />
-              <meshStandardMaterial
-                color="#d8d4cc"
-                roughness={0.85}
-                transparent
-                opacity={0.6}
+            {/* Rooms */}
+            {floorRooms.map((room) => (
+              <Room
+                key={room.id}
+                room={room}
+                allDoors={doors}
+                allWindows={windows}
+                openDoors={openDoors}
+                openWindows={openWindows}
+                windowModes={windowModes}
+                toggleDoor={toggleDoor}
+                toggleWindow={toggleWindow}
               />
-            </mesh>
-          );
-        })}
+            ))}
+
+            {/* User-placed furniture */}
+            {floorFurn.map((f) => (
+              <Furniture3D key={f.id} item={f} />
+            ))}
+
+            {/* Roof / ceiling slabs */}
+            {!showRoof &&
+              floorRooms.map((room) => {
+                const x = room.x * SC,
+                  z = room.y * SC;
+                const rw = room.width * SC,
+                  rd = room.height * SC;
+                return (
+                  <mesh
+                    key={`roof-${room.id}`}
+                    position={[x + rw / 2, WALL_H + 0.04, z + rd / 2]}
+                  >
+                    <boxGeometry args={[rw, 0.08, rd]} />
+                    <meshStandardMaterial
+                      color="#d8d4cc"
+                      roughness={0.85}
+                      transparent
+                      opacity={showAllFloors ? 0.25 : 0.6}
+                    />
+                  </mesh>
+                );
+              })}
+          </group>
+        );
+      })}
     </>
   );
 }
 
 // ── Camera auto-position ──────────────────────────────────────
-function AutoCamera({ grounds, rooms, activeFloor }) {
+function AutoCamera({ grounds, rooms, floors, activeFloor, showAllFloors }) {
+  const visFloorIds = showAllFloors ? floors.map((f) => f.id) : [activeFloor];
+
   const visGrounds = grounds
-    .filter((g) => g.floor === activeFloor)
+    .filter((g) => visFloorIds.includes(g.floor))
     .map((g) => ({ ...g, points: normalizeGroundPoints(g) }));
-  const vis = rooms.filter((r) => r.floor === activeFloor);
+  const vis = rooms.filter((r) => visFloorIds.includes(r.floor));
+
   const { center, extent } = useMemo(() => {
     if (!vis.length && visGrounds.length === 0)
       return { center: [0, 0, 0], extent: 6 };
@@ -1351,14 +1429,19 @@ function AutoCamera({ grounds, rooms, activeFloor }) {
     const maxX = Math.max(...source.map((p) => p.x)) * SC;
     const minZ = Math.min(...source.map((p) => p.y)) * SC;
     const maxZ = Math.max(...source.map((p) => p.y)) * SC;
+    const totalH = visFloorIds.length * STOREY_H;
     return {
-      center: [(minX + maxX) / 2, 0, (minZ + maxZ) / 2],
-      extent: Math.max(maxX - minX, maxZ - minZ),
+      center: [(minX + maxX) / 2, totalH / 2, (minZ + maxZ) / 2],
+      extent: Math.max(maxX - minX, maxZ - minZ, totalH),
     };
-  }, [vis, visGrounds]);
+  }, [vis, visGrounds, visFloorIds]);
 
-  const dist = extent * 1.4;
-  const camPos = [center[0] + dist, dist * 1.1, center[2] + dist];
+  const dist = extent * (showAllFloors ? 1.8 : 1.4);
+  const camPos = [
+    center[0] + dist,
+    center[1] + dist * (showAllFloors ? 0.9 : 1.1),
+    center[2] + dist,
+  ];
 
   return (
     <>
@@ -1367,14 +1450,14 @@ function AutoCamera({ grounds, rooms, activeFloor }) {
         position={camPos}
         fov={42}
         near={0.1}
-        far={150}
+        far={200}
       />
       <OrbitControls
         target={center}
         enableDamping
         dampingFactor={0.06}
         minDistance={2}
-        maxDistance={40}
+        maxDistance={80}
         maxPolarAngle={Math.PI / 2.05}
         enablePan
         panSpeed={0.8}
@@ -1386,10 +1469,34 @@ function AutoCamera({ grounds, rooms, activeFloor }) {
 }
 
 // ── Main export ───────────────────────────────────────────────
+const BTN = {
+  background: "rgba(10,14,20,0.82)",
+  backdropFilter: "blur(12px)",
+  border: "1px solid rgba(255,255,255,0.12)",
+  borderRadius: 8,
+  padding: "8px 14px",
+  color: "#e6edf3",
+  fontSize: 12,
+  fontWeight: 500,
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  transition: "border-color 0.2s, background 0.2s",
+};
+
 export default function ThreeDViewer() {
-  const [showRoof, setShowRoof] = useState(true); // open by default so interiors visible
+  const [showRoof, setShowRoof] = useState(true);
   const [timeOfDay, setTimeOfDay] = useState(0.75);
-  const { grounds, rooms, activeFloor } = useDesignStore();
+  const [showAllFloors, setShowAllFloors] = useState(false);
+  const { grounds, rooms, floors, activeFloor } = useDesignStore();
+
+  // Count how many floors actually have content
+  const populatedFloors = floors.filter(
+    (f) =>
+      grounds.some((g) => g.floor === f.id) ||
+      rooms.some((r) => r.floor === f.id),
+  );
 
   return (
     <div style={{ position: "absolute", inset: 0, background: "#1a2030" }}>
@@ -1397,7 +1504,7 @@ export default function ThreeDViewer() {
         shadows={{ type: "PCFSoftShadowMap" }}
         gl={{
           antialias: true,
-          toneMapping: 3 /* ACESFilmicToneMapping */,
+          toneMapping: 3,
           toneMappingExposure: 1.15,
         }}
         dpr={[1, 2]}
@@ -1406,9 +1513,15 @@ export default function ThreeDViewer() {
           <AutoCamera
             grounds={grounds}
             rooms={rooms}
+            floors={floors}
             activeFloor={activeFloor}
+            showAllFloors={showAllFloors}
           />
-          <Scene showRoof={showRoof} timeOfDay={timeOfDay} />
+          <Scene
+            showRoof={showRoof}
+            timeOfDay={timeOfDay}
+            showAllFloors={showAllFloors}
+          />
         </Suspense>
       </Canvas>
 
@@ -1423,31 +1536,94 @@ export default function ThreeDViewer() {
           gap: 8,
         }}
       >
-        <button
-          onClick={() => setShowRoof((r) => !r)}
-          style={{
-            background: "rgba(10,14,20,0.75)",
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(255,255,255,0.12)",
-            borderRadius: 8,
-            padding: "8px 14px",
-            color: "#e6edf3",
-            fontSize: 12,
-            fontWeight: 500,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          {showRoof ? "⊡ Close Roof View" : "🏠 Open Roof (Interior View)"}
+        {/* Roof toggle */}
+        <button onClick={() => setShowRoof((r) => !r)} style={BTN}>
+          {showRoof ? "⊡ Close Roof" : "🏠 Interior View"}
         </button>
 
-        {/* Time slider */}
+        {/* All-Floors toggle — only show when >1 populated floor exists */}
+        {populatedFloors.length > 1 && (
+          <button
+            onClick={() => setShowAllFloors((v) => !v)}
+            style={{
+              ...BTN,
+              border: showAllFloors
+                ? "1px solid #4f8ef7"
+                : "1px solid rgba(255,255,255,0.12)",
+              background: showAllFloors
+                ? "rgba(30,60,120,0.85)"
+                : BTN.background,
+              color: showAllFloors ? "#90c8ff" : "#e6edf3",
+            }}
+          >
+            🏢 {showAllFloors ? "Single Floor" : "View All Floors"}
+          </button>
+        )}
+
+        {/* Floor level legend (shown in all-floors mode) */}
+        {showAllFloors && populatedFloors.length > 1 && (
+          <div
+            style={{
+              background: "rgba(10,14,20,0.82)",
+              backdropFilter: "blur(12px)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              borderRadius: 8,
+              padding: "10px 14px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 10,
+                color: "#8b949e",
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                marginBottom: 2,
+              }}
+            >
+              FLOOR LEVELS
+            </div>
+            {populatedFloors.map((f, idx) => (
+              <div
+                key={f.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  opacity: f.id === activeFloor ? 1 : 0.65,
+                }}
+              >
+                <div
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: 3,
+                    background:
+                      f.id === activeFloor ? "#4f8ef7" : "#4a5568",
+                    flexShrink: 0,
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: f.id === activeFloor ? "#e6edf3" : "#8b949e",
+                    fontWeight: f.id === activeFloor ? 600 : 400,
+                  }}
+                >
+                  +{(idx * STOREY_H).toFixed(1)} m — {f.name}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Time of day */}
         <div
           style={{
-            background: "rgba(10,14,20,0.75)",
-            backdropFilter: "blur(10px)",
+            background: "rgba(10,14,20,0.82)",
+            backdropFilter: "blur(12px)",
             border: "1px solid rgba(255,255,255,0.12)",
             borderRadius: 8,
             padding: "10px 14px",
@@ -1497,7 +1673,10 @@ export default function ThreeDViewer() {
           whiteSpace: "nowrap",
         }}
       >
-        🖱 Drag to rotate · Scroll to zoom · <strong style={{color:"#e8c890",fontWeight:700}}>🚪 Click any door to open / close</strong>
+        🖱 Drag to rotate · Scroll to zoom ·{" "}
+        <strong style={{ color: "#e8c890", fontWeight: 700 }}>
+          🚪 Click any door to open / close
+        </strong>
       </div>
     </div>
   );
