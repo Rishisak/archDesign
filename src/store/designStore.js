@@ -497,35 +497,59 @@ export const useDesignStore = create(
     // ── Floor management ──────────────────────────────────────────────────
     addFloor: () =>
       set((s) => {
-        const newId = Date.now(); // unique, ordered id
+        const newId = Date.now();
         const orderedFloors = [...s.floors].sort((a, b) => a.id - b.id);
-        const newIndex = orderedFloors.length; // e.g. 2 → "2nd Floor"
+        const newIndex = orderedFloors.length;
         const suffix =
-          newIndex === 1
-            ? "1st"
-            : newIndex === 2
-              ? "2nd"
-              : newIndex === 3
-                ? "3rd"
-                : `${newIndex}th`;
+          newIndex === 1 ? "1st"
+          : newIndex === 2 ? "2nd"
+          : newIndex === 3 ? "3rd"
+          : `${newIndex}th`;
         const newFloor = { id: newId, name: `${suffix} Floor`, height: newIndex * 300 };
 
-        // Clone ground-floor (id===0 or first floor) outlines into the new floor
-        const baseFloor = orderedFloors[0];
-        const baseGrounds = s.grounds
-          .filter((g) => g.floor === baseFloor.id)
-          .map((g) => ({
-            ...g,
+        const baseFloorId = orderedFloors[0].id;
+        const baseRooms = s.rooms.filter((r) => r.floor === baseFloorId);
+
+        let autoGrounds = [];
+
+        if (baseRooms.length > 0) {
+          // ── Derive ground from the bounding box of all ground-floor rooms ──
+          // Add a small margin (10 px) so rooms on the upper floor can align
+          // exactly to the same edges without the point-in-polygon check failing.
+          const MARGIN = 10;
+          const minX = Math.min(...baseRooms.map((r) => r.x)) - MARGIN;
+          const minY = Math.min(...baseRooms.map((r) => r.y)) - MARGIN;
+          const maxX = Math.max(...baseRooms.map((r) => r.x + r.width)) + MARGIN;
+          const maxY = Math.max(...baseRooms.map((r) => r.y + r.height)) + MARGIN;
+
+          autoGrounds = [{
             id: genId("ground"),
             floor: newId,
-            name: g.name + " (ref)",
-          }));
+            name: "Auto (from ground floor rooms)",
+            points: [
+              { x: minX, y: minY },
+              { x: maxX, y: minY },
+              { x: maxX, y: maxY },
+              { x: minX, y: maxY },
+            ],
+          }];
+        } else {
+          // Fallback: copy explicit ground polygons if no rooms exist
+          autoGrounds = s.grounds
+            .filter((g) => g.floor === baseFloorId)
+            .map((g) => ({
+              ...g,
+              id: genId("ground"),
+              floor: newId,
+              name: g.name + " (ref)",
+            }));
+        }
 
         return {
           floors: [...s.floors, newFloor],
-          grounds: [...s.grounds, ...baseGrounds],
+          grounds: [...s.grounds, ...autoGrounds],
           activeFloor: newId,
-          // Mark the new floor as 3D-previewed so rooms can be drawn immediately
+          // Pre-approve so rooms can be drawn immediately – no 3D preview required
           groundPreviewed3D: { ...s.groundPreviewed3D, [newId]: true },
         };
       }),
@@ -893,27 +917,31 @@ export const useDesignStore = create(
       const height = Math.abs(snap(drawCurrent.y - drawStart.y));
 
       if (width > 40 && height > 40 && activeTool === "room") {
+        const { floors } = get();
+        const sortedFloors = [...floors].sort((a, b) => a.id - b.id);
+        const groundFloorId = sortedFloors[0]?.id;
+        const isUpperFloor = activeFloor !== groundFloorId;
+
         const floorGrounds = grounds
           .filter((g) => g.floor === activeFloor)
           .map(normalizeGround);
+
         if (floorGrounds.length === 0) {
-          alert("Draw a ground footprint first.");
-        } else if (!groundPreviewed3D[activeFloor]) {
+          if (isUpperFloor) {
+            // Upper floor with no ground yet — just place the room (rare edge case)
+            addRoom({ x, y, width, height, name: "New Room", color: "#f0f4ff", type: "room" });
+          } else {
+            alert("Draw a ground footprint first.");
+          }
+        } else if (!isUpperFloor && !groundPreviewed3D[activeFloor]) {
+          // Only enforce the 3D-preview gate on the ground floor itself
           alert("Preview your ground in 3D View before creating rooms.");
         } else {
           const inside = rectInsideAnyGround(x, y, width, height, floorGrounds);
           if (!inside) {
-            alert("Room must stay inside the ground footprint.");
+            alert("Room must stay inside the building footprint.");
           } else {
-            addRoom({
-              x,
-              y,
-              width,
-              height,
-              name: "New Room",
-              color: "#f0f4ff",
-              type: "room",
-            });
+            addRoom({ x, y, width, height, name: "New Room", color: "#f0f4ff", type: "room" });
           }
         }
       }

@@ -127,16 +127,25 @@ export default function Toolbar() {
 
   const handleToolClick = (toolId) => {
     if (toolId === "room") {
-      const hasGround = grounds.some((g) => g.floor === activeFloor);
-      if (!hasGround) {
-        alert("Draw a ground footprint first using the Ground tool.");
-        setActiveTool("ground");
-        return;
+      const { floors: allFloors } = useDesignStore.getState();
+      const sortedFloors = [...allFloors].sort((a, b) => a.id - b.id);
+      const groundFloorId = sortedFloors[0]?.id;
+      const isUpperFloor = activeFloor !== groundFloorId;
+
+      if (!isUpperFloor) {
+        // Ground-floor specific gates
+        const hasGround = grounds.some((g) => g.floor === activeFloor);
+        if (!hasGround) {
+          alert("Draw a ground footprint first using the Ground tool.");
+          setActiveTool("ground");
+          return;
+        }
+        if (!groundPreviewed3D[activeFloor]) {
+          alert("Open 3D View once to preview the ground before creating rooms.");
+          return;
+        }
       }
-      if (!groundPreviewed3D[activeFloor]) {
-        alert("Open 3D View once to preview the ground before creating rooms.");
-        return;
-      }
+      // Upper floors: auto-ground was injected on creation, skip gates entirely
     }
 
     if (toolId === "furniture") {

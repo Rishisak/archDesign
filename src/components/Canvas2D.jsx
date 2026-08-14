@@ -555,14 +555,13 @@ export default function Canvas2D() {
   const visRooms = rooms.filter((r) => r.floor === activeFloor);
   const visibleFurn = furniture.filter((f) => f.floor === activeFloor);
 
-  // ── Ghost outlines: ground-floor boundary shown on upper floors ───────────
+  // ── Ghost reference: ground-floor rooms shown on upper floors ────────────
   const sortedFloors = [...floors].sort((a, b) => a.id - b.id);
   const groundFloorId = sortedFloors[0]?.id;
   const isUpperFloor = activeFloor !== groundFloorId;
-  const ghostGrounds = isUpperFloor
-    ? grounds
-        .filter((g) => g.floor === groundFloorId)
-        .map((g) => ({ ...g, points: normalizeGroundPoints(g) }))
+  // Ghost: ground-floor rooms (layout reference) + overall bounding outline
+  const ghostRooms = isUpperFloor
+    ? rooms.filter((r) => r.floor === groundFloorId)
     : [];
 
   let preview = null;
@@ -708,38 +707,79 @@ export default function Canvas2D() {
             );
           })}
 
-          {/* ── Ghost ground outline from ground floor (for upper floors) ── */}
-          {ghostGrounds.map((ground) => (
-            <g key={`ghost-${ground.id}`} pointerEvents="none">
-              <path
-                d={polygonPath(ground.points)}
-                fill="rgba(79,142,247,0.04)"
-                stroke="rgba(79,142,247,0.35)"
-                strokeWidth={2 / z}
-                strokeDasharray={`${10 / z} ${5 / z}`}
-              />
-              {ground.points.map((p, i) => (
-                <circle
-                  key={i}
-                  cx={p.x}
-                  cy={p.y}
-                  r={3 / z}
-                  fill="rgba(79,142,247,0.5)"
-                />
+          {/* ── Ghost ground-floor rooms (reference for upper floors) ── */}
+          {isUpperFloor && ghostRooms.length > 0 && (
+            <g pointerEvents="none">
+              {/* Overall bounding box outline */}
+              {(() => {
+                const minX = Math.min(...ghostRooms.map((r) => r.x));
+                const minY = Math.min(...ghostRooms.map((r) => r.y));
+                const maxX = Math.max(...ghostRooms.map((r) => r.x + r.width));
+                const maxY = Math.max(...ghostRooms.map((r) => r.y + r.height));
+                return (
+                  <rect
+                    x={minX - 6}
+                    y={minY - 6}
+                    width={maxX - minX + 12}
+                    height={maxY - minY + 12}
+                    fill="none"
+                    stroke="rgba(79,142,247,0.4)"
+                    strokeWidth={2 / z}
+                    strokeDasharray={`${12 / z} ${6 / z}`}
+                    rx={4}
+                  />
+                );
+              })()}
+
+              {/* Per-room ghost rectangles */}
+              {ghostRooms.map((room) => (
+                <g key={`ghost-room-${room.id}`}>
+                  <rect
+                    x={room.x}
+                    y={room.y}
+                    width={room.width}
+                    height={room.height}
+                    fill="rgba(79,142,247,0.06)"
+                    stroke="rgba(79,142,247,0.30)"
+                    strokeWidth={1.5 / z}
+                    strokeDasharray={`${6 / z} ${3 / z}`}
+                    rx={2}
+                  />
+                  {/* Room label */}
+                  <text
+                    x={room.x + room.width / 2}
+                    y={room.y + room.height / 2}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fill="rgba(79,142,247,0.55)"
+                    fontSize={Math.max(7, 9 / z)}
+                    fontFamily="Inter,sans-serif"
+                    fontWeight="500"
+                  >
+                    {room.name}
+                  </text>
+                </g>
               ))}
-              <text
-                x={polygonCentroid(ground.points).x}
-                y={polygonCentroid(ground.points).y}
-                textAnchor="middle"
-                fill="rgba(79,142,247,0.6)"
-                fontSize={Math.max(7, 10 / z)}
-                fontFamily="Inter,sans-serif"
-                fontWeight="600"
-              >
-                ⬇ Ground outline (ref)
-              </text>
+
+              {/* Legend label */}
+              {ghostRooms.length > 0 && (() => {
+                const minX = Math.min(...ghostRooms.map((r) => r.x));
+                const minY = Math.min(...ghostRooms.map((r) => r.y));
+                return (
+                  <text
+                    x={minX}
+                    y={minY - 14 / z}
+                    fill="rgba(79,142,247,0.6)"
+                    fontSize={Math.max(7, 9 / z)}
+                    fontFamily="Inter,sans-serif"
+                    fontWeight="600"
+                  >
+                    ⬇ Ground floor layout (reference)
+                  </text>
+                );
+              })()}
             </g>
-          ))}
+          )}
 
           {activeTool === "ground" && groundDraftPoints.length > 0 && (
             <g pointerEvents="none">

@@ -18,7 +18,7 @@ export default function Header() {
     snapToGrid, setSnapToGrid,
     clearDesign, loadDemo,
     exportProjectJSON, importProjectJSON,
-    grounds,
+    rooms,
   } = useDesignStore();
 
   const fileInputRef = useRef(null);
@@ -51,12 +51,10 @@ export default function Header() {
 
   // Sort floors by creation order (id ascending — ground=0 is first)
   const sortedFloors = [...floors].sort((a, b) => a.id - b.id);
-
-  // Ground floor is always the one with id === 0 (or smallest id)
   const groundFloorId = sortedFloors[0]?.id;
 
-  // Is ground floor drawn?
-  const groundFloorHasOutline = grounds.some((g) => g.floor === groundFloorId);
+  // Add Floor requires at least 1 room on the ground floor
+  const groundFloorHasRooms = rooms.some((r) => r.floor === groundFloorId);
 
   return (
     <header style={{
@@ -205,13 +203,15 @@ export default function Header() {
         {/* + Add Floor */}
         <button
           onClick={() => {
-            if (!groundFloorHasOutline) {
-              alert('Please draw the Ground Floor outline first before adding upper floors.');
+            if (!groundFloorHasRooms) {
+              alert('Design at least one room on the Ground Floor first. The room layout will carry over as the building footprint for upper floors.');
               return;
             }
             addFloor();
           }}
-          title="Add a new floor (ground outline auto-copied)"
+          title={groundFloorHasRooms
+            ? 'Add a new floor — Ground Floor room layout auto-copied as footprint'
+            : 'Design ground floor rooms first'}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -223,8 +223,8 @@ export default function Header() {
             border: '1px dashed var(--border)',
             borderRadius: 6,
             color: 'var(--text-muted)',
-            cursor: groundFloorHasOutline ? 'pointer' : 'not-allowed',
-            opacity: groundFloorHasOutline ? 1 : 0.45,
+            cursor: groundFloorHasRooms ? 'pointer' : 'not-allowed',
+            opacity: groundFloorHasRooms ? 1 : 0.45,
             flexShrink: 0,
             transition: 'all 0.15s',
             whiteSpace: 'nowrap',
