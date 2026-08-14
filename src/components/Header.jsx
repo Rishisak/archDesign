@@ -11,7 +11,6 @@ export default function Header() {
   const {
     viewMode, setViewMode,
     showAIPanel, setShowAIPanel,
-    showLibrary, setShowLibrary,
     snapToGrid, setSnapToGrid,
     clearDesign, loadDemo,
     exportProjectJSON
@@ -96,19 +95,6 @@ export default function Header() {
             <circle cx="8" cy="6" r="3"/>
             <path d="M2 14c0-3 2.7-5 6-5s6 2 6 5"/>
             <path d="M8 1v1M1 6h1M15 6h-1M3 3l.7.7M13 3l-.7.7"/>
-          </svg>
-        </button>
-
-        {/* Library */}
-        <button
-          className={`icon-btn ${showLibrary ? 'active' : ''}`}
-          onClick={() => setShowLibrary(!showLibrary)}
-          title="Asset Library"
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M2 3h12v2H2z"/>
-            <path d="M2 7h12v2H2z"/>
-            <path d="M2 11h12v2H2z"/>
           </svg>
         </button>
 

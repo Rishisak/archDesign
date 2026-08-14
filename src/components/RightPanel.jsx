@@ -152,52 +152,16 @@ export const LIBRARY_ITEMS = [
     h: 190,
     color: "#ab47bc",
   },
-  {
-    category: "beds",
-    icon: "🛏️",
-    name: "Queen Bed",
-    type: "bed_queen",
-    w: 160,
-    h: 200,
-    color: "#7b1fa2",
-  },
-  {
-    category: "beds",
-    icon: "🛏️",
-    name: "King Bed",
-    type: "bed_king",
-    w: 190,
-    h: 200,
-    color: "#673ab7",
-  },
-  {
-    category: "beds",
-    icon: "🛏️",
-    name: "Bunk Bed",
-    type: "bed_bunk",
-    w: 100,
-    h: 190,
-    color: "#512da8",
-  },
 
   // ── Tables & Desks ──
   {
     category: "tables",
     icon: "🍽️",
-    name: "Dining Table (4-Seat)",
+    name: "Dining Table",
     type: "dining_4",
     w: 120,
     h: 80,
     color: "#8d6e63",
-  },
-  {
-    category: "tables",
-    icon: "🍽️",
-    name: "Dining Table (6-Seat)",
-    type: "dining_6",
-    w: 170,
-    h: 90,
-    color: "#6d4c41",
   },
   {
     category: "tables",
@@ -217,118 +181,12 @@ export const LIBRARY_ITEMS = [
     h: 65,
     color: "#5d4037",
   },
-  {
-    category: "tables",
-    icon: "🛏️",
-    name: "Bedside Table",
-    type: "nightstand",
-    w: 45,
-    h: 45,
-    color: "#bcaaa4",
-  },
-
-  // ── Storage & Appliances ──
-  {
-    category: "storage",
-    icon: "🪞",
-    name: "Wardrobe",
-    type: "wardrobe",
-    w: 160,
-    h: 60,
-    color: "#4e342e",
-  },
-  {
-    category: "storage",
-    icon: "👟",
-    name: "Shoe Rack",
-    type: "shoerack",
-    w: 90,
-    h: 35,
-    color: "#3e2723",
-  },
-  {
-    category: "storage",
-    icon: "📺",
-    name: "TV Unit & Console",
-    type: "tv_unit",
-    w: 150,
-    h: 40,
-    color: "#212121",
-  },
-
-  // ── Bath & Decor ──
-  {
-    category: "decor",
-    icon: "🛁",
-    name: "Bathtub",
-    type: "bath",
-    w: 80,
-    h: 150,
-    color: "#0288d1",
-  },
-  {
-    category: "decor",
-    icon: "🚿",
-    name: "Shower Cabinet",
-    type: "shower",
-    w: 90,
-    h: 90,
-    color: "#03a9f4",
-  },
-  {
-    category: "decor",
-    icon: "🌿",
-    name: "Plant",
-    type: "plant",
-    w: 40,
-    h: 40,
-    color: "#2e7d32",
-  },
-  {
-    category: "decor",
-    icon: "🪜",
-    name: "Staircase",
-    type: "stairs",
-    w: 110,
-    h: 240,
-    color: "#d4b483",
-  },
-];
-
-const THEMES = [
-  {
-    id: "modern",
-    name: "Modern Minimal",
-    colors: ["#e2e8f0", "#f8f9fa", "#cbd5e1"],
-  },
-  {
-    id: "japandi",
-    name: "Japandi Wood",
-    colors: ["#d4b896", "#f5f0e8", "#a08060"],
-  },
-  {
-    id: "industrial",
-    name: "Warm Industrial",
-    colors: ["#b4a090", "#2a2420", "#8a7060"],
-  },
-  {
-    id: "scandinavian",
-    name: "Scandinavian",
-    colors: ["#f0ece8", "#ffffff", "#d0c8c0"],
-  },
-  {
-    id: "cyberpunk",
-    name: "Cyberpunk Neon",
-    colors: ["#2a0a3a", "#0a1a2a", "#bc8cff"],
-  },
 ];
 
 const AI_RESPONSES = [
   "Your Living Room is well-proportioned at 3.2m × 2.4m. I recommend adding a second window on the east wall for better cross-ventilation.",
   "Based on the current layout, the Kitchen-to-Dining distance is optimal. The traffic flow from the entrance to bedrooms follows a logical path.",
-  "The Master Bedroom size (2.4m × 2.0m) is slightly below the recommended 3m × 4m. Consider expanding into the adjacent Hallway space.",
   "Great layout! The hallway provides clear circulation. I suggest adding a coat closet near the entrance — typical size: 1.0m × 0.6m.",
-  "The Bathroom has no natural light source. A skylight or frosted window on the north wall would improve ventilation and reduce mold risk.",
   "For a modern open-plan feel, consider removing the wall between Kitchen and Living Room. This would increase natural light by approximately 40%.",
 ];
 
@@ -615,7 +473,7 @@ function AIPanel() {
   const [messages, setMessages] = useState([
     {
       role: "ai",
-      text: "👋 Hi! I'm Archie, your AI design copilot. I've analysed your current layout and have some suggestions ready. You can also ask me anything about your design!",
+      text: "👋 Hi! I'm Archie, your AI design copilot. Ask me anything about your building layout!",
     },
   ]);
   const [input, setInput] = useState("");
@@ -694,450 +552,6 @@ function AIPanel() {
     </div>
   );
 }
-
-function RoomsPanel() {
-  const {
-    rooms,
-    doors,
-    windows,
-    furniture,
-    selectedId,
-    updateRoom,
-    deleteRoom,
-    extendRoom,
-    mergeRooms,
-    deleteDoor,
-    deleteWindow,
-    openDoors,
-    toggleDoor,
-    activeFloor,
-  } = useDesignStore();
-  const vis = rooms.filter((r) => r.floor === activeFloor);
-  const selRoom = vis.find((r) => r.id === selectedId);
-  const selDoor = doors.find((d) => d.id === selectedId);
-  const selWin = windows.find((w) => w.id === selectedId);
-
-  return (
-    <div>
-      {selDoor && (
-        <div
-          style={{
-            marginBottom: 12,
-            padding: 12,
-            background: "var(--bg-tertiary)",
-            borderRadius: "var(--radius-md)",
-            border: "1px solid var(--accent)",
-          }}
-        >
-          <div className="section-header">🚪 Selected Door</div>
-          <div className="prop-group">
-            <div className="prop-label">Status</div>
-            <button
-              className={`btn ${openDoors.has(selDoor.id) ? "btn-success" : "btn-primary"}`}
-              style={{ width: "100%" }}
-              onClick={() => toggleDoor(selDoor.id)}
-            >
-              {openDoors.has(selDoor.id)
-                ? "▲ Open (Click to Close)"
-                : "▼ Closed (Click to Open)"}
-            </button>
-          </div>
-          <button
-            className="btn btn-danger w-full"
-            style={{ width: "100%", justifyContent: "center", marginTop: 8 }}
-            onClick={() => deleteDoor(selDoor.id)}
-          >
-            🗑 Delete Door
-          </button>
-        </div>
-      )}
-
-      {selWin && (
-        <div
-          style={{
-            marginBottom: 12,
-            padding: 12,
-            background: "var(--bg-tertiary)",
-            borderRadius: "var(--radius-md)",
-            border: "1px solid var(--accent)",
-          }}
-        >
-          <div className="section-header">🪟 Selected Window</div>
-          <button
-            className="btn btn-danger w-full"
-            style={{ width: "100%", justifyContent: "center", marginTop: 8 }}
-            onClick={() => deleteWindow(selWin.id)}
-          >
-            🗑 Delete Window
-          </button>
-        </div>
-      )}
-
-      {selRoom && (
-        <div
-          style={{
-            marginBottom: 12,
-            padding: 12,
-            background: "var(--bg-tertiary)",
-            borderRadius: "var(--radius-md)",
-            border: "1px solid var(--accent)",
-          }}
-        >
-          <div className="section-header">🏠 Room Settings</div>
-          <div className="prop-group">
-            <div className="prop-label">Room Name</div>
-            <input
-              className="prop-input"
-              value={selRoom.name}
-              onChange={(e) =>
-                updateRoom(selRoom.id, { name: e.target.value })
-              }
-            />
-          </div>
-          <div className="prop-group">
-            <div className="prop-label">Room Type</div>
-            <select
-              className="prop-input"
-              value={selRoom.type || "room"}
-              onChange={(e) =>
-                updateRoom(selRoom.id, { type: e.target.value })
-              }
-            >
-              {ROOM_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="prop-group">
-            <div className="prop-label">Floor Color</div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(5, 1fr)",
-                gap: 4,
-              }}
-            >
-              {ROOM_COLORS.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => updateRoom(selRoom.id, { color: c })}
-                  style={{
-                    height: 24,
-                    borderRadius: 4,
-                    background: c,
-                    border:
-                      selRoom.color === c
-                        ? "2px solid var(--accent)"
-                        : "1px solid var(--border)",
-                    cursor: "pointer",
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="prop-group" style={{ marginTop: 8 }}>
-            <div className="prop-label">📏 Extend Room Size</div>
-            <div
-              style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}
-            >
-              <button
-                className="btn btn-secondary"
-                style={{ fontSize: 11, padding: "4px" }}
-                onClick={() => extendRoom(selRoom.id, "top", 50)}
-              >
-                ↑ Top +50cm
-              </button>
-              <button
-                className="btn btn-secondary"
-                style={{ fontSize: 11, padding: "4px" }}
-                onClick={() => extendRoom(selRoom.id, "bottom", 50)}
-              >
-                ↓ Bottom +50cm
-              </button>
-              <button
-                className="btn btn-secondary"
-                style={{ fontSize: 11, padding: "4px" }}
-                onClick={() => extendRoom(selRoom.id, "left", 50)}
-              >
-                ← Left +50cm
-              </button>
-              <button
-                className="btn btn-secondary"
-                style={{ fontSize: 11, padding: "4px" }}
-                onClick={() => extendRoom(selRoom.id, "right", 50)}
-              >
-                → Right +50cm
-              </button>
-            </div>
-          </div>
-
-          {vis.filter((r) => r.id !== selRoom.id).length > 0 && (
-            <div className="prop-group" style={{ marginTop: 8 }}>
-              <div className="prop-label">🔗 Join / Merge Room</div>
-              <div style={{ display: "flex", gap: 6 }}>
-                <select
-                  id="merge-room-target"
-                  className="prop-input"
-                  style={{ fontSize: 11 }}
-                >
-                  {vis
-                    .filter((r) => r.id !== selRoom.id)
-                    .map((other) => (
-                      <option key={other.id} value={other.id}>
-                        {other.name}
-                      </option>
-                    ))}
-                </select>
-                <button
-                  className="btn btn-primary"
-                  style={{
-                    fontSize: 11,
-                    padding: "4px 8px",
-                    whiteSpace: "nowrap",
-                  }}
-                  onClick={() => {
-                    const targetEl =
-                      document.getElementById("merge-room-target");
-                    if (targetEl && targetEl.value) {
-                      mergeRooms(selRoom.id, targetEl.value);
-                    }
-                  }}
-                >
-                  🔗 Merge
-                </button>
-              </div>
-            </div>
-          )}
-
-          <button
-            className="btn btn-danger w-full"
-            style={{ width: "100%", justifyContent: "center", marginTop: 8 }}
-            onClick={() => deleteRoom(selRoom.id)}
-          >
-            🗑 Delete Room
-          </button>
-        </div>
-      )}
-
-      <div
-        style={{
-          marginTop: 12,
-          padding: 10,
-          background: "var(--bg-tertiary)",
-          borderRadius: "var(--radius-md)",
-          border: "1px solid var(--border)",
-          fontSize: 11,
-          color: "var(--text-muted)",
-        }}
-      >
-        <strong style={{ color: "var(--text-secondary)" }}>Total area:</strong>{" "}
-        {vis
-          .reduce((a, r) => a + (r.width / 100) * (r.height / 100), 0)
-          .toFixed(1)}{" "}
-        m²
-        {" · "}
-        <strong style={{ color: "var(--text-secondary)" }}>
-          {vis.length}
-        </strong>{" "}
-        rooms
-      </div>
-    </div>
-  );
-}
-
-function LibraryPanel() {
-  const { addFurniture, activeFloor, rooms } = useDesignStore();
-  const [search, setSearch] = useState("");
-  const [catFilter, setCatFilter] = useState("all");
-
-  const filtered = LIBRARY_ITEMS.filter((i) => {
-    const matchSearch = i.name.toLowerCase().includes(search.toLowerCase());
-    const matchCat = catFilter === "all" || i.category === catFilter;
-    return matchSearch && matchCat;
-  });
-
-  const place = (item) => {
-    const r = rooms.find((rm) => rm.floor === activeFloor);
-    addFurniture({
-      roomId: r?.id ?? null,
-      type: item.type,
-      x: r ? r.x + 30 : 100,
-      y: r ? r.y + 30 : 100,
-      width: item.w,
-      height: item.h,
-      color: item.color,
-      label: item.name,
-      rotation: 0,
-    });
-  };
-
-  const categories = [
-    { id: "all", label: "All" },
-    { id: "doors", label: "🚪 Doors" },
-    { id: "windows", label: "🪟 Windows" },
-    { id: "seating", label: "Seating" },
-    { id: "beds", label: "Beds" },
-    { id: "tables", label: "Tables" },
-    { id: "storage", label: "Storage" },
-    { id: "decor", label: "Bath/Decor" },
-  ];
-
-  return (
-    <div>
-      <div className="section-header">Furniture & Asset Library</div>
-      <input
-        className="prop-input"
-        placeholder="🔍 Search furniture..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        style={{ marginBottom: 8 }}
-      />
-
-      <div
-        style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 12 }}
-      >
-        {categories.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => setCatFilter(c.id)}
-            style={{
-              padding: "3px 8px",
-              fontSize: 11,
-              borderRadius: 99,
-              border: "1px solid var(--border)",
-              background:
-                catFilter === c.id ? "var(--accent)" : "var(--bg-tertiary)",
-              color: catFilter === c.id ? "#fff" : "var(--text-secondary)",
-              cursor: "pointer",
-              fontWeight: catFilter === c.id ? 600 : 400,
-            }}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="library-grid">
-        {filtered.map((item, i) => (
-          <div
-            key={i}
-            className="lib-item"
-            onClick={() => place(item)}
-            draggable={true}
-            onDragStart={(e) =>
-              e.dataTransfer.setData("application/json", JSON.stringify(item))
-            }
-            title={`Click or Drag to place ${item.name}`}
-          >
-            <div className="lib-item-icon">{item.icon}</div>
-            <div className="lib-item-name">{item.name}</div>
-          </div>
-        ))}
-      </div>
-      {filtered.length === 0 && (
-        <div
-          style={{
-            color: "var(--text-muted)",
-            fontSize: 12,
-            textAlign: "center",
-            padding: 20,
-          }}
-        >
-          No furniture found matching your search.
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ThemePanel() {
-  const { theme, setTheme, pbrMaterialTheme, setPBRMaterialTheme } =
-    useDesignStore();
-
-  return (
-    <div>
-      <div className="section-header">Design Theme</div>
-      {THEMES.map((t) => (
-        <div
-          key={t.id}
-          className={`theme-card ${theme === t.id ? "active" : ""}`}
-          onClick={() => setTheme(t.id)}
-        >
-          <div className="theme-swatch">
-            {t.colors.map((c, i) => (
-              <div key={i} className="theme-dot" style={{ background: c }} />
-            ))}
-          </div>
-          <span
-            style={{
-              fontSize: 12,
-              fontWeight: 500,
-              color: "var(--text-primary)",
-            }}
-          >
-            {t.name}
-          </span>
-          {theme === t.id && (
-            <span
-              style={{
-                marginLeft: "auto",
-                color: "var(--green)",
-                fontSize: 12,
-              }}
-            >
-              ✓
-            </span>
-          )}
-        </div>
-      ))}
-
-      <div className="section-header" style={{ marginTop: 16 }}>
-        PBR Material Engine
-      </div>
-      <div className="prop-group">
-        <div className="prop-label">Floor PBR Texture</div>
-        <select
-          className="prop-input"
-          value={pbrMaterialTheme.floorTexture}
-          onChange={(e) =>
-            setPBRMaterialTheme({ floorTexture: e.target.value })
-          }
-        >
-          <option value="hardwood_parquet">🪵 Hardwood Parquet</option>
-          <option value="marble_tiles">🏛️ Polished Marble Tiles</option>
-          <option value="ceramic_tiles">🔲 Ceramic Tiles</option>
-          <option value="terracotta">🧱 Terracotta Clay</option>
-          <option value="carpet">🧶 Plush Carpet</option>
-        </select>
-      </div>
-      <div className="prop-group">
-        <div className="prop-label">Wall PBR Surface</div>
-        <select
-          className="prop-input"
-          value={pbrMaterialTheme.wallTexture}
-          onChange={(e) => setPBRMaterialTheme({ wallTexture: e.target.value })}
-        >
-          <option value="modern_paint">🎨 Smooth Modern Paint</option>
-          <option value="brick_stone">🧱 Brick / Stone Accent</option>
-          <option value="wood_panel">🪵 Wood Slats / Paneling</option>
-          <option value="concrete">🏗️ Industrial Concrete</option>
-        </select>
-      </div>
-    </div>
-  );
-}
-
-const TABS = [
-  { id: "floors", label: "🏢 Floors" },
-  { id: "rooms", label: "🏠 Rooms" },
-  { id: "library", label: "🛋️ Library" },
-  { id: "ai", label: "🤖 AI" },
-  { id: "theme", label: "🎨 Theme" },
-];
 
 const FURN_COLORS = [
   "#546e7a", "#37474f", "#78909c", "#4e342e", "#6d4c41",
@@ -1551,17 +965,64 @@ export function FurniturePropertiesPanel() {
 
 // ─── Main Right Panel Sidebar Export ─────────────────────────────────────────
 export default function RightPanel() {
-  const { showAIPanel, showLibrary } = useDesignStore();
+  const { showAIPanel } = useDesignStore();
+  const [isOpen, setIsOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("floors");
 
-  // Sync header button toggles with active tab
+  // Sync AI button toggle from top header
   useEffect(() => {
-    if (showAIPanel) setActiveTab("ai");
+    if (showAIPanel) {
+      setIsOpen(true);
+      setActiveTab("ai");
+    }
   }, [showAIPanel]);
 
-  useEffect(() => {
-    if (showLibrary) setActiveTab("library");
-  }, [showLibrary]);
+  // Clean, focused tabs (Rooms, Library, Theme removed per request)
+  const tabs = [
+    { id: "floors", label: "🏢 Floors" },
+    { id: "ai", label: "🤖 AI Copilot" },
+  ];
+
+  // When collapsed/hidden, render a sleek small toggle button on the top right
+  if (!isOpen) {
+    return (
+      <button
+        onClick={() => setIsOpen(true)}
+        title="Open Floors Panel"
+        style={{
+          position: "absolute",
+          top: 16,
+          right: 16,
+          zIndex: 120,
+          background: "rgba(10,14,20,0.85)",
+          backdropFilter: "blur(12px)",
+          border: "1px solid rgba(255,255,255,0.15)",
+          borderRadius: 8,
+          padding: "8px 14px",
+          color: "#e6edf3",
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+          transition: "all 0.2s",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = "var(--accent)";
+          e.currentTarget.style.color = "var(--accent)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)";
+          e.currentTarget.style.color = "#e6edf3";
+        }}
+      >
+        <span>◀</span>
+        <span>🏢 Floors Panel</span>
+      </button>
+    );
+  }
 
   return (
     <aside
@@ -1575,52 +1036,86 @@ export default function RightPanel() {
         borderLeft: "1px solid var(--border)",
         height: "100%",
         zIndex: 50,
+        position: "relative",
       }}
     >
-      {/* Panel Navigation Tabs */}
+      {/* Panel Top Header Bar with Tabs & Small Hide Panel Button */}
       <div
         style={{
           display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
           borderBottom: "1px solid var(--border)",
           background: "var(--bg-secondary)",
+          paddingRight: 10,
           flexShrink: 0,
         }}
       >
-        {TABS.map((tab) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                flex: 1,
-                padding: "11px 4px",
-                fontSize: 11,
-                fontWeight: isActive ? 700 : 500,
-                border: "none",
-                background: isActive ? "var(--bg-tertiary)" : "transparent",
-                color: isActive ? "var(--accent)" : "var(--text-muted)",
-                cursor: "pointer",
-                borderBottom: isActive
-                  ? "2px solid var(--accent)"
-                  : "2px solid transparent",
-                transition: "all 0.15s",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
+        <div style={{ display: "flex", flex: 1 }}>
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  flex: 1,
+                  padding: "11px 12px",
+                  fontSize: 11,
+                  fontWeight: isActive ? 700 : 500,
+                  border: "none",
+                  background: isActive ? "var(--bg-tertiary)" : "transparent",
+                  color: isActive ? "var(--accent)" : "var(--text-muted)",
+                  cursor: "pointer",
+                  borderBottom: isActive
+                    ? "2px solid var(--accent)"
+                    : "2px solid transparent",
+                  transition: "all 0.15s",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Small Hide Panel Toggle Option */}
+        <button
+          onClick={() => setIsOpen(false)}
+          title="Hide panel to view full website layout"
+          style={{
+            background: "var(--bg-tertiary)",
+            border: "1px solid var(--border)",
+            borderRadius: 6,
+            padding: "4px 8px",
+            color: "var(--text-muted)",
+            fontSize: 11,
+            fontWeight: 500,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            transition: "all 0.15s",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = "var(--text-primary)";
+            e.currentTarget.style.borderColor = "var(--border-bright)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = "var(--text-muted)";
+            e.currentTarget.style.borderColor = "var(--border)";
+          }}
+        >
+          <span>Hide</span>
+          <span>▶</span>
+        </button>
       </div>
 
-      {/* Tab Body */}
+      {/* Panel Body */}
       <div className="panel-body" style={{ flex: 1, overflowY: "auto", padding: 14 }}>
         {activeTab === "floors" && <FloorsPanel />}
-        {activeTab === "rooms" && <RoomsPanel />}
-        {activeTab === "library" && <LibraryPanel />}
         {activeTab === "ai" && <AIPanel />}
-        {activeTab === "theme" && <ThemePanel />}
       </div>
     </aside>
   );
