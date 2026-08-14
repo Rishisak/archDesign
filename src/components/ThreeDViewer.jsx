@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useState, Suspense } from "react";
+import React, { useRef, useMemo, useState, useCallback, Suspense } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import * as THREE from "three";
@@ -468,34 +468,67 @@ function WindowMesh({ win, pos, size, isOpen, mode = "sliding", onToggle }) {
 // ── Door mesh (interactive swing opening with single-pivot 90° frame lerp) ──
 function DoorMesh({ door, pos, size, isOpen, onToggle }) {
   const [dw, dh, dd] = size;
+  const [hovered, setHovered] = useState(false);
   const isH = door.wall === "top" || door.wall === "bottom";
   const targetAngle = isOpen ? (isH ? -Math.PI / 2 : Math.PI / 2) : 0;
   const hingeRef = useRef();
+  const angleRef = useRef(0);
 
   useFrame((_, delta) => {
     if (hingeRef.current) {
-      hingeRef.current.rotation.y = THREE.MathUtils.damp(
-        hingeRef.current.rotation.y,
+      // Spring-like smooth damp: fast start, gentle ease-out
+      angleRef.current = THREE.MathUtils.damp(
+        angleRef.current,
         targetAngle,
-        14,
+        8,
         delta,
       );
+      hingeRef.current.rotation.y = angleRef.current;
     }
   });
+
+  const handleClick = useCallback(
+    (e) => {
+      e.stopPropagation();
+      if (onToggle && door) onToggle(door.id);
+    },
+    [onToggle, door],
+  );
+
+  const handlePointerOver = useCallback((e) => {
+    e.stopPropagation();
+    setHovered(true);
+    document.body.style.cursor = "pointer";
+  }, []);
+
+  const handlePointerOut = useCallback((e) => {
+    e.stopPropagation();
+    setHovered(false);
+    document.body.style.cursor = "auto";
+  }, []);
+
+  // Emissive colours for feedback
+  const frameEmissive = hovered ? "#4a3010" : "#000000";
+  const leafColor = isOpen ? "#e8c890" : hovered ? "#9a7c54" : "#7a5c3a";
+  const leafEmissive = isOpen
+    ? hovered ? "#604020" : "#3a2010"
+    : hovered ? "#2a1a08" : "#000000";
+  const knobEmissive = hovered ? "#6a5010" : isOpen ? "#4a3808" : "#000000";
 
   return (
     <group
       position={pos}
-      onClick={(e) => {
-        e.stopPropagation();
-        if (onToggle && door) onToggle(door.id);
-      }}
+      onClick={handleClick}
+      onPointerOver={handlePointerOver}
+      onPointerOut={handlePointerOut}
     >
       {/* Door Frame */}
       <mesh castShadow receiveShadow>
         <boxGeometry args={[dw + 0.03, dh + 0.03, dd * 1.05]} />
         <meshStandardMaterial
           color="#6b4c2a"
+          emissive={frameEmissive}
+          emissiveIntensity={1}
           roughness={0.7}
           polygonOffset
           polygonOffsetFactor={0.5}
@@ -509,7 +542,9 @@ function DoorMesh({ door, pos, size, isOpen, onToggle }) {
         <mesh position={[dw / 2, 0, 0]} castShadow receiveShadow>
           <boxGeometry args={[dw * 0.96, dh * 0.96, dd * 0.65]} />
           <meshStandardMaterial
-            color={isOpen ? "#e8b878" : "#7a5c3a"}
+            color={leafColor}
+            emissive={leafEmissive}
+            emissiveIntensity={1}
             roughness={0.65}
             polygonOffset
             polygonOffsetFactor={0.2}
@@ -518,11 +553,22 @@ function DoorMesh({ door, pos, size, isOpen, onToggle }) {
         </mesh>
         {/* Brass Knob */}
         <mesh position={[dw * 0.85, 0, dd * 0.55]} castShadow>
-          <sphereGeometry args={[0.04, 8, 8]} />
+          <sphereGeometry args={[0.045, 10, 10]} />
           <meshStandardMaterial
             color="#c8a840"
-            roughness={0.2}
-            metalness={0.85}
+            emissive={knobEmissive}
+            emissiveIntensity={1}
+            roughness={0.15}
+            metalness={0.9}
+          />
+        </mesh>
+        {/* Knob back plate */}
+        <mesh position={[dw * 0.85, 0, -dd * 0.55]} castShadow>
+          <sphereGeometry args={[0.04, 10, 10]} />
+          <meshStandardMaterial
+            color="#c8a840"
+            roughness={0.15}
+            metalness={0.9}
           />
         </mesh>
       </group>
@@ -985,19 +1031,108 @@ function Room({
 }
 
 // ── Geometry helpers for wall segments ───────────────────────
+// Carves real openings (doors & windows) into each wall side by splitting
+// the wall into left/right flanking panels plus a transom above the gap.
 function buildWallSegments(cx, cz, rw, rd, side, doors, windows) {
   const h = WALL_H;
   const t = WALL_T;
   const segs = [];
 
-  if (side === "north")
-    segs.push({ pos: [cx, h / 2, cz - rd / 2 + t / 2], size: [rw, h, t] });
-  if (side === "south")
-    segs.push({ pos: [cx, h / 2, cz + rd / 2 - t / 2], size: [rw, h, t] });
-  if (side === "west")
-    segs.push({ pos: [cx - rw / 2 + t / 2, h / 2, cz], size: [t, h, rd] });
-  if (side === "east")
-    segs.push({ pos: [cx + rw / 2 - t / 2, h / 2, cz], size: [t, h, rd] });
+  // Map door-wall names → which axis the opening lives on
+  // "top"/"bottom" walls run along X; "left"/"right" walls run along Z
+  const wallMap = { north: "top", south: "bottom", west: "left", east: "right" };
+  const wallKey = wallMap[side];
+
+  // Collect all openings on this wall (doors + windows)
+  const wallDoors = doors.filter((d) => d.wall === wallKey);
+  const wallWindows = windows.filter((w) => w.wall === wallKey);
+
+  // Build a sorted list of openings: { start, end, floorY, ceilY }
+  // where start/end are in LOCAL wall-length coordinates (0 → wallLength)
+  const wallLen = side === "north" || side === "south" ? rw : rd;
+
+  const openings = [];
+
+  wallDoors.forEach((d) => {
+    const dw = d.width * SC;
+    const center = d.position * wallLen;          // position is 0–1 fraction
+    openings.push({
+      start: center - dw / 2,
+      end: center + dw / 2,
+      floorY: 0,
+      ceilY: 2.2,                                 // full-height door opening
+    });
+  });
+
+  wallWindows.forEach((w) => {
+    const ww = w.width * SC;
+    const center = w.position * wallLen;
+    openings.push({
+      start: center - ww / 2,
+      end: center + ww / 2,
+      floorY: 1.1,                                // sill height
+      ceilY: 1.1 + 1.1,                           // sill + 1.1 m height
+    });
+  });
+
+  // Sort openings left-to-right along the wall
+  openings.sort((a, b) => a.start - b.start);
+
+  if (openings.length === 0) {
+    // No openings – full solid wall
+    if (side === "north")
+      segs.push({ pos: [cx, h / 2, cz - rd / 2 + t / 2], size: [rw, h, t] });
+    if (side === "south")
+      segs.push({ pos: [cx, h / 2, cz + rd / 2 - t / 2], size: [rw, h, t] });
+    if (side === "west")
+      segs.push({ pos: [cx - rw / 2 + t / 2, h / 2, cz], size: [t, h, rd] });
+    if (side === "east")
+      segs.push({ pos: [cx + rw / 2 - t / 2, h / 2, cz], size: [t, h, rd] });
+    return segs;
+  }
+
+  // Helper to add a wall slab
+  // For north/south walls the "long" axis is X, for east/west it is Z.
+  const addSlab = (localStart, localEnd, yBot, yTop) => {
+    const segLen = localEnd - localStart;
+    if (segLen <= 0.001) return;
+    const segHeight = yTop - yBot;
+    if (segHeight <= 0.001) return;
+    const midLocal = (localStart + localEnd) / 2;
+    const midY = (yBot + yTop) / 2;
+
+    if (side === "north") {
+      const wx = (cx - wallLen / 2) + midLocal;
+      segs.push({ pos: [wx, midY, cz - rd / 2 + t / 2], size: [segLen, segHeight, t] });
+    } else if (side === "south") {
+      const wx = (cx - wallLen / 2) + midLocal;
+      segs.push({ pos: [wx, midY, cz + rd / 2 - t / 2], size: [segLen, segHeight, t] });
+    } else if (side === "west") {
+      const wz = (cz - wallLen / 2) + midLocal;
+      segs.push({ pos: [cx - rw / 2 + t / 2, midY, wz], size: [t, segHeight, segLen] });
+    } else if (side === "east") {
+      const wz = (cz - wallLen / 2) + midLocal;
+      segs.push({ pos: [cx + rw / 2 - t / 2, midY, wz], size: [t, segHeight, segLen] });
+    }
+  };
+
+  // Walk along the wall, filling solid regions between openings
+  let cursor = 0;
+  openings.forEach((op) => {
+    // Panel to the LEFT of this opening (full height)
+    if (op.start > cursor) addSlab(cursor, op.start, 0, h);
+
+    // Sill panel BELOW the opening (only for windows)
+    if (op.floorY > 0) addSlab(op.start, op.end, 0, op.floorY);
+
+    // Transom panel ABOVE the opening
+    if (op.ceilY < h) addSlab(op.start, op.end, op.ceilY, h);
+
+    cursor = op.end;
+  });
+
+  // Panel to the RIGHT of the last opening (full height)
+  if (cursor < wallLen) addSlab(cursor, wallLen, 0, h);
 
   return segs;
 }
@@ -1362,7 +1497,7 @@ export default function ThreeDViewer() {
           whiteSpace: "nowrap",
         }}
       >
-        🖱 Left drag to rotate · Right drag / two-finger to pan · Scroll to zoom
+        🖱 Drag to rotate · Scroll to zoom · <strong style={{color:"#e8c890",fontWeight:700}}>🚪 Click any door to open / close</strong>
       </div>
     </div>
   );
