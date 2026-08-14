@@ -122,6 +122,7 @@ export default function Canvas2D() {
     doors,
     windows,
     furniture,
+    floors,
     activeFloor,
     activeTool,
     setActiveTool,
@@ -554,6 +555,16 @@ export default function Canvas2D() {
   const visRooms = rooms.filter((r) => r.floor === activeFloor);
   const visibleFurn = furniture.filter((f) => f.floor === activeFloor);
 
+  // ── Ghost outlines: ground-floor boundary shown on upper floors ───────────
+  const sortedFloors = [...floors].sort((a, b) => a.id - b.id);
+  const groundFloorId = sortedFloors[0]?.id;
+  const isUpperFloor = activeFloor !== groundFloorId;
+  const ghostGrounds = isUpperFloor
+    ? grounds
+        .filter((g) => g.floor === groundFloorId)
+        .map((g) => ({ ...g, points: normalizeGroundPoints(g) }))
+    : [];
+
   let preview = null;
   if (isDrawingRoom && drawStart && drawCurrent) {
     preview = {
@@ -696,6 +707,39 @@ export default function Canvas2D() {
               </g>
             );
           })}
+
+          {/* ── Ghost ground outline from ground floor (for upper floors) ── */}
+          {ghostGrounds.map((ground) => (
+            <g key={`ghost-${ground.id}`} pointerEvents="none">
+              <path
+                d={polygonPath(ground.points)}
+                fill="rgba(79,142,247,0.04)"
+                stroke="rgba(79,142,247,0.35)"
+                strokeWidth={2 / z}
+                strokeDasharray={`${10 / z} ${5 / z}`}
+              />
+              {ground.points.map((p, i) => (
+                <circle
+                  key={i}
+                  cx={p.x}
+                  cy={p.y}
+                  r={3 / z}
+                  fill="rgba(79,142,247,0.5)"
+                />
+              ))}
+              <text
+                x={polygonCentroid(ground.points).x}
+                y={polygonCentroid(ground.points).y}
+                textAnchor="middle"
+                fill="rgba(79,142,247,0.6)"
+                fontSize={Math.max(7, 10 / z)}
+                fontFamily="Inter,sans-serif"
+                fontWeight="600"
+              >
+                ⬇ Ground outline (ref)
+              </text>
+            </g>
+          ))}
 
           {activeTool === "ground" && groundDraftPoints.length > 0 && (
             <g pointerEvents="none">

@@ -493,6 +493,74 @@ export const useDesignStore = create(
       }),
     setActiveTool: (tool) => set({ activeTool: tool, selectedId: null }),
     setActiveFloor: (floor) => set({ activeFloor: floor }),
+
+    // ── Floor management ──────────────────────────────────────────────────
+    addFloor: () =>
+      set((s) => {
+        const newId = Date.now(); // unique, ordered id
+        const orderedFloors = [...s.floors].sort((a, b) => a.id - b.id);
+        const newIndex = orderedFloors.length; // e.g. 2 → "2nd Floor"
+        const suffix =
+          newIndex === 1
+            ? "1st"
+            : newIndex === 2
+              ? "2nd"
+              : newIndex === 3
+                ? "3rd"
+                : `${newIndex}th`;
+        const newFloor = { id: newId, name: `${suffix} Floor`, height: newIndex * 300 };
+
+        // Clone ground-floor (id===0 or first floor) outlines into the new floor
+        const baseFloor = orderedFloors[0];
+        const baseGrounds = s.grounds
+          .filter((g) => g.floor === baseFloor.id)
+          .map((g) => ({
+            ...g,
+            id: genId("ground"),
+            floor: newId,
+            name: g.name + " (ref)",
+          }));
+
+        return {
+          floors: [...s.floors, newFloor],
+          grounds: [...s.grounds, ...baseGrounds],
+          activeFloor: newId,
+          // Mark the new floor as 3D-previewed so rooms can be drawn immediately
+          groundPreviewed3D: { ...s.groundPreviewed3D, [newId]: true },
+        };
+      }),
+
+    deleteFloor: (id) =>
+      set((s) => {
+        if (s.floors.length <= 1) return {}; // must keep at least 1 floor
+        const remaining = s.floors.filter((f) => f.id !== id);
+        const newActive =
+          s.activeFloor === id
+            ? remaining[remaining.length - 1].id
+            : s.activeFloor;
+        return {
+          floors: remaining,
+          activeFloor: newActive,
+          rooms: s.rooms.filter((r) => r.floor !== id),
+          doors: s.doors.filter((d) => {
+            const room = s.rooms.find((r) => r.id === d.roomId);
+            return room ? room.floor !== id : true;
+          }),
+          windows: s.windows.filter((w) => {
+            const room = s.rooms.find((r) => r.id === w.roomId);
+            return room ? room.floor !== id : true;
+          }),
+          furniture: s.furniture.filter((f) => f.floor !== id),
+          grounds: s.grounds.filter((g) => g.floor !== id),
+          selectedId: null,
+        };
+      }),
+
+    renameFloor: (id, name) =>
+      set((s) => ({
+        floors: s.floors.map((f) => (f.id === id ? { ...f, name } : f)),
+      })),
+
     setSelectedId: (id) => set({ selectedId: id }),
     setShowAIPanel: (v) => set({ showAIPanel: v }),
     setShowLibrary: (v) => set({ showLibrary: v }),
