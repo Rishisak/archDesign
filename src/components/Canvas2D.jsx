@@ -152,6 +152,8 @@ export default function Canvas2D() {
     toggleDoor,
     openWindows,
     toggleWindow,
+    canvas2DTheme,
+    toggleCanvas2DTheme,
   } = useDesignStore();
 
   // ── Auto-fit rooms into view on first load ──────────────────
@@ -581,6 +583,29 @@ export default function Canvas2D() {
         ? "grabbing"
         : "default";
 
+  const isDark = canvas2DTheme === "dark";
+  const themeColors = {
+    bg: isDark ? "#0b0f19" : "#f6f4ee",
+    gridMajor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)",
+    gridMinor: isDark ? "rgba(255,255,255,0.035)" : "rgba(0,0,0,0.035)",
+    roomFillStd: isDark ? "#141c2b" : "#fbf9f4",
+    roomFillBath: isDark ? "#282019" : "#d0baa4",
+    wallFill: isDark ? "#38475c" : "#181818",
+    wallStroke: isDark ? "#94a3b8" : "#181818",
+    roomTitleText: isDark ? "#f8fafc" : "#111111",
+    roomDimText: isDark ? "#94a3b8" : "#555555",
+    doorArc: isDark ? "#60a5fa" : "#222222",
+    doorLeaf: isDark ? "#38bdf8" : "#111111",
+    doorJamb: isDark ? "#475569" : "#181818",
+    windowPane: isDark ? "#38bdf8" : "#222222",
+    furnFill: isDark ? "#1e293b" : "#ffffff",
+    furnStroke: isDark ? "#e2e8f0" : "#181818",
+    furnText: isDark ? "#f8fafc" : "#111111",
+    outerDimLine: isDark ? "#94a3b8" : "#111111",
+    outerDimText: isDark ? "#f8fafc" : "#111111",
+    porchFill: isDark ? "#1e293b" : "#e5dabf",
+  };
+
   return (
     <div
       ref={divRef}
@@ -598,16 +623,45 @@ export default function Canvas2D() {
       onDragOver={(e) => e.preventDefault()}
       onDrop={handleDrop}
     >
-      {/* Grid background */}
+      {/* Floating Light/Dark Mode Theme Switcher */}
+      <button
+        onClick={toggleCanvas2DTheme}
+        title="Switch 2D Plan Theme (Light / Dark)"
+        style={{
+          position: "absolute",
+          top: 16,
+          left: 80,
+          zIndex: 100,
+          background: isDark ? "rgba(30,41,59,0.9)" : "rgba(255,255,255,0.9)",
+          backdropFilter: "blur(8px)",
+          border: isDark ? "1px solid rgba(255,255,255,0.2)" : "1px solid rgba(0,0,0,0.15)",
+          borderRadius: 99,
+          padding: "6px 14px",
+          fontSize: 12,
+          fontWeight: 600,
+          color: isDark ? "#f8fafc" : "#111111",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          boxShadow: "0 2px 10px rgba(0,0,0,0.15)",
+          transition: "all 0.2s",
+        }}
+      >
+        <span>{isDark ? "🌙 Dark Plan" : "☀️ Light Plan"}</span>
+      </button>
+
+      {/* Architectural Graph Paper background */}
       <div
         style={{
           position: "absolute",
           inset: 0,
+          backgroundColor: themeColors.bg,
           backgroundImage: `
-          linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px),
-          linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)
+          linear-gradient(${themeColors.gridMajor} 1px, transparent 1px),
+          linear-gradient(90deg, ${themeColors.gridMajor} 1px, transparent 1px),
+          linear-gradient(${themeColors.gridMinor} 1px, transparent 1px),
+          linear-gradient(90deg, ${themeColors.gridMinor} 1px, transparent 1px)
         `,
           backgroundSize: `${100 * z}px ${100 * z}px, ${100 * z}px ${100 * z}px, ${20 * z}px ${20 * z}px, ${20 * z}px ${20 * z}px`,
           backgroundPosition: `${pan.x}px ${pan.y}px, ${pan.x}px ${pan.y}px, ${pan.x}px ${pan.y}px, ${pan.x}px ${pan.y}px`,
@@ -626,14 +680,21 @@ export default function Canvas2D() {
         overflow="visible"
       >
         <defs>
-          <filter id="room-shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <filter id="room-shadow" x="-10%" y="-10%" width="120%" height="120%">
             <feDropShadow
               dx="0"
-              dy="4"
-              stdDeviation="6"
-              floodColor="rgba(0,0,0,0.4)"
+              dy="2"
+              stdDeviation="3"
+              floodColor="rgba(0,0,0,0.15)"
             />
           </filter>
+          <pattern id="tile-pattern" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(0,0,0,0.05)" strokeWidth="0.8"/>
+          </pattern>
+          <pattern id="bath-tile-pattern" width="16" height="16" patternUnits="userSpaceOnUse">
+            <rect width="16" height="16" fill="#cbb7a1"/>
+            <path d="M 16 0 L 0 0 0 16" fill="none" stroke="rgba(0,0,0,0.12)" strokeWidth="1"/>
+          </pattern>
         </defs>
 
         <g transform={`translate(${pan.x},${pan.y}) scale(${z})`}>
@@ -834,6 +895,55 @@ export default function Canvas2D() {
             </g>
           )}
 
+          {/* ── Entrance & Back Porch Slabs (matching reference image) ── */}
+          {visRooms.length > 0 && (
+            <g pointerEvents="none">
+              {/* Bottom Main Entrance Porch */}
+              <rect x={460} y={1050} width={240} height={35} fill={themeColors.porchFill} stroke={themeColors.wallStroke} strokeWidth={1.5 / z} rx={2} />
+              <line x1={460} y1={1067} x2={700} y2={1067} stroke={themeColors.wallStroke} strokeWidth={1 / z} />
+              {/* Top Back Exit Porch */}
+              <rect x={480} y={65} width={200} height={35} fill={themeColors.porchFill} stroke={themeColors.wallStroke} strokeWidth={1.5 / z} rx={2} />
+              <line x1={480} y1={82} x2={680} y2={82} stroke={themeColors.wallStroke} strokeWidth={1 / z} />
+            </g>
+          )}
+
+          {/* ── AutoCAD Outer Dimension Lines (14.20 m × 11.60 m) ── */}
+          {visRooms.length > 0 && (
+            <g pointerEvents="none">
+              {/* TOP DIMENSION LINE (14.20 m) */}
+              <line x1={100} y1={30} x2={1120} y2={30} stroke={themeColors.outerDimLine} strokeWidth={1.2 / z} />
+              <circle cx={100} cy={30} r={4 / z} fill={themeColors.outerDimLine} />
+              <circle cx={1120} cy={30} r={4 / z} fill={themeColors.outerDimLine} />
+              <line x1={100} y1={20} x2={100} y2={90} stroke={themeColors.outerDimLine} strokeWidth={0.8 / z} strokeOpacity="0.5" />
+              <line x1={1120} y1={20} x2={1120} y2={90} stroke={themeColors.outerDimLine} strokeWidth={0.8 / z} strokeOpacity="0.5" />
+              <text x={610} y={22} textAnchor="middle" fill={themeColors.outerDimText} fontSize={Math.max(8, 14 / z)} fontWeight="700" fontFamily="Inter, sans-serif">14.20 m</text>
+
+              {/* BOTTOM DIMENSION LINE (14.20 m) */}
+              <line x1={100} y1={1120} x2={1120} y2={1120} stroke={themeColors.outerDimLine} strokeWidth={1.2 / z} />
+              <circle cx={100} cy={1120} r={4 / z} fill={themeColors.outerDimLine} />
+              <circle cx={1120} cy={1120} r={4 / z} fill={themeColors.outerDimLine} />
+              <line x1={100} y1={1060} x2={100} y2={1130} stroke={themeColors.outerDimLine} strokeWidth={0.8 / z} strokeOpacity="0.5" />
+              <line x1={1120} y1={1060} x2={1120} y2={1130} stroke={themeColors.outerDimLine} strokeWidth={0.8 / z} strokeOpacity="0.5" />
+              <text x={610} y={1142} textAnchor="middle" fill={themeColors.outerDimText} fontSize={Math.max(8, 14 / z)} fontWeight="700" fontFamily="Inter, sans-serif">14.20 m</text>
+
+              {/* LEFT DIMENSION LINE (11.60 m) */}
+              <line x1={30} y1={100} x2={30} y2={1050} stroke={themeColors.outerDimLine} strokeWidth={1.2 / z} />
+              <circle cx={30} cy={100} r={4 / z} fill={themeColors.outerDimLine} />
+              <circle cx={30} cy={1050} r={4 / z} fill={themeColors.outerDimLine} />
+              <line x1={20} y1={100} x2={90} y2={100} stroke={themeColors.outerDimLine} strokeWidth={0.8 / z} strokeOpacity="0.5" />
+              <line x1={20} y1={1050} x2={90} y2={1050} stroke={themeColors.outerDimLine} strokeWidth={0.8 / z} strokeOpacity="0.5" />
+              <text x={20} y={575} textAnchor="middle" fill={themeColors.outerDimText} fontSize={Math.max(8, 14 / z)} fontWeight="700" fontFamily="Inter, sans-serif" transform={`rotate(-90, 20, 575)`}>11.60 m</text>
+
+              {/* RIGHT DIMENSION LINE (11.60 m) */}
+              <line x1={1190} y1={100} x2={1190} y2={1050} stroke={themeColors.outerDimLine} strokeWidth={1.2 / z} />
+              <circle cx={1190} cy={100} r={4 / z} fill={themeColors.outerDimLine} />
+              <circle cx={1190} cy={1050} r={4 / z} fill={themeColors.outerDimLine} />
+              <line x1={1130} y1={100} x2={1200} y2={100} stroke={themeColors.outerDimLine} strokeWidth={0.8 / z} strokeOpacity="0.5" />
+              <line x1={1130} y1={1050} x2={1200} y2={1050} stroke={themeColors.outerDimLine} strokeWidth={0.8 / z} strokeOpacity="0.5" />
+              <text x={1205} y={575} textAnchor="middle" fill={themeColors.outerDimText} fontSize={Math.max(8, 14 / z)} fontWeight="700" fontFamily="Inter, sans-serif" transform={`rotate(90, 1205, 575)`}>11.60 m</text>
+            </g>
+          )}
+
           {/* Rooms */}
           {visRooms.map((room) => {
             const sel = selectedId === room.id;
@@ -863,42 +973,64 @@ export default function Canvas2D() {
                   />
                 )}
 
-                {/* Room fill + wall stroke */}
+                {/* Room Floor Fill */}
                 <rect
                   x={room.x}
                   y={room.y}
                   width={room.width}
                   height={room.height}
-                  fill={room.color}
-                  stroke={sel ? "#4f8ef7" : "#9aaabb"}
-                  strokeWidth={sel ? 3 / z : WALL_THICKNESS / z}
-                  rx={2}
-                  filter="url(#room-shadow)"
+                  fill={
+                    room.type === "bathroom"
+                      ? themeColors.roomFillBath
+                      : themeColors.roomFillStd
+                  }
+                />
+                {/* Tile overlay */}
+                <rect
+                  x={room.x}
+                  y={room.y}
+                  width={room.width}
+                  height={room.height}
+                  fill="url(#tile-pattern)"
+                  pointerEvents="none"
                 />
 
-                {/* Labels */}
+                {/* Solid AutoCAD Walls */}
+                <rect
+                  x={room.x}
+                  y={room.y}
+                  width={room.width}
+                  height={room.height}
+                  fill="none"
+                  stroke={sel ? "#4f8ef7" : themeColors.wallFill}
+                  strokeWidth={sel ? Math.max(3 / z, 14 / z) : 16 / z}
+                />
+
+                {/* AutoCAD Room Labels (Title + Dimensions String) */}
                 <text
                   x={room.x + room.width / 2}
-                  y={room.y + room.height / 2 - 8}
+                  y={room.y + room.height / 2 - 6}
                   textAnchor="middle"
-                  fill="rgba(20,30,50,0.75)"
-                  fontSize={Math.max(8, 14 / z)}
-                  fontWeight="600"
-                  fontFamily="Inter,sans-serif"
+                  fill={themeColors.roomTitleText}
+                  fontSize={Math.max(7, 13 / z)}
+                  fontWeight="700"
+                  fontFamily="'Space Grotesk', Inter, sans-serif"
+                  letterSpacing="0.04em"
                   pointerEvents="none"
                 >
-                  {room.name}
+                  {room.name.toUpperCase()}
                 </text>
                 <text
                   x={room.x + room.width / 2}
                   y={room.y + room.height / 2 + 10}
                   textAnchor="middle"
-                  fill="rgba(20,30,50,0.45)"
+                  fill={themeColors.roomDimText}
                   fontSize={Math.max(6, 10 / z)}
-                  fontFamily="Inter,sans-serif"
+                  fontFamily="Inter, sans-serif"
+                  fontWeight="500"
                   pointerEvents="none"
                 >
-                  {((room.width / 100) * (room.height / 100)).toFixed(1)} m²
+                  {(room.width / 100).toFixed(1)}m × {(room.height / 100).toFixed(1)}m
                 </text>
 
                 {/* Dimension lines */}
@@ -1028,7 +1160,7 @@ export default function Canvas2D() {
             );
           })}
 
-          {/* Doors — clickable to open/close with animated swing and selection */}
+          {/* Doors — AutoCAD Architectural Door Graphic with Quarter-Arc Swing */}
           {doors.map((door) => {
             const room = rooms.find((r) => r.id === door.roomId);
             if (!room || room.floor !== activeFloor) return null;
@@ -1041,20 +1173,59 @@ export default function Canvas2D() {
             const isH = door.wall === "top" || door.wall === "bottom";
             const isOpen = openDoors.has(door.id);
             const isSel = selectedId === door.id;
-            const arc = door.width * 0.85;
+            const isDouble = door.type === "door_double";
+            const leafLength = isDouble ? door.width / 2 : door.width;
 
-            // Hinge corner pivot point
-            let pivotX, pivotY;
+            // Compute exact arc and leaf line coordinates based on wall direction
+            let arcPath = "";
+            let openTipX = t.x;
+            let openTipY = t.y;
+            let closedTipX = t.x + door.width;
+            let closedTipY = t.y + WALL_THICKNESS / 2;
+            let hingeX = t.x;
+            let hingeY = t.y + WALL_THICKNESS / 2;
+
             if (isH) {
-              pivotX = t.x;
-              pivotY = t.y + WALL_THICKNESS / 2;
+              if (door.wall === "bottom") {
+                // Swings up into room
+                arcPath = `M ${t.x + leafLength} ${t.y + WALL_THICKNESS} A ${leafLength} ${leafLength} 0 0 0 ${t.x} ${t.y + WALL_THICKNESS - leafLength}`;
+                openTipX = t.x;
+                openTipY = t.y + WALL_THICKNESS / 2 - leafLength;
+                closedTipX = t.x + leafLength;
+                closedTipY = t.y + WALL_THICKNESS / 2;
+                hingeX = t.x;
+                hingeY = t.y + WALL_THICKNESS / 2;
+              } else {
+                // Swings down into room
+                arcPath = `M ${t.x + leafLength} ${t.y} A ${leafLength} ${leafLength} 0 0 1 ${t.x} ${t.y + leafLength}`;
+                openTipX = t.x;
+                openTipY = t.y + WALL_THICKNESS / 2 + leafLength;
+                closedTipX = t.x + leafLength;
+                closedTipY = t.y + WALL_THICKNESS / 2;
+                hingeX = t.x;
+                hingeY = t.y + WALL_THICKNESS / 2;
+              }
             } else {
-              pivotX = t.x + WALL_THICKNESS / 2;
-              pivotY = t.y;
+              if (door.wall === "left") {
+                // Swings right into room
+                arcPath = `M ${t.x} ${t.y + leafLength} A ${leafLength} ${leafLength} 0 0 0 ${t.x + leafLength} ${t.y}`;
+                openTipX = t.x + WALL_THICKNESS / 2 + leafLength;
+                openTipY = t.y;
+                closedTipX = t.x + WALL_THICKNESS / 2;
+                closedTipY = t.y + leafLength;
+                hingeX = t.x + WALL_THICKNESS / 2;
+                hingeY = t.y;
+              } else {
+                // Swings left into room
+                arcPath = `M ${t.x + WALL_THICKNESS} ${t.y + leafLength} A ${leafLength} ${leafLength} 0 0 1 ${t.x + WALL_THICKNESS - leafLength} ${t.y}`;
+                openTipX = t.x + WALL_THICKNESS / 2 - leafLength;
+                openTipY = t.y;
+                closedTipX = t.x + WALL_THICKNESS / 2;
+                closedTipY = t.y + leafLength;
+                hingeX = t.x + WALL_THICKNESS / 2;
+                hingeY = t.y;
+              }
             }
-
-            const openAngle = isH ? -90 : 90;
-            const angle = isOpen ? openAngle : 0;
 
             return (
               <g
@@ -1070,16 +1241,16 @@ export default function Canvas2D() {
                   }
                 }}
               >
-                {/* Wall gap */}
+                {/* Wall Opening Gap */}
                 <rect
                   x={t.x}
                   y={t.y}
                   width={t.w}
                   height={t.h}
-                  fill={room.color}
+                  fill={themeColors.roomFillStd}
                 />
 
-                {/* Selection highlight */}
+                {/* Selection Highlight */}
                 {isSel && (
                   <rect
                     x={t.x - 4 / z}
@@ -1089,87 +1260,77 @@ export default function Canvas2D() {
                     fill="none"
                     stroke="#4f8ef7"
                     strokeWidth={2 / z}
-                    strokeDasharray={`${3 / z} ${2 / z}`}
+                    strokeDasharray={`${4 / z} ${2 / z}`}
                     rx={2}
                   />
                 )}
 
-                {/* Door frame */}
-                <rect
-                  x={t.x}
-                  y={t.y}
-                  width={t.w}
-                  height={t.h}
-                  fill="none"
-                  stroke="#7a5030"
-                  strokeWidth={1.5 / z}
-                />
-
-                {/* Rotating Door Leaf */}
-                <g
-                  style={{
-                    transformOrigin: `${pivotX}px ${pivotY}px`,
-                    transform: `rotate(${angle}deg)`,
-                    transition: "transform 0.4s cubic-bezier(0.4,0,0.2,1)",
-                    transformBox: "fill-box",
-                  }}
-                >
-                  <rect
-                    x={t.x}
-                    y={t.y}
-                    width={isH ? door.width : WALL_THICKNESS}
-                    height={isH ? WALL_THICKNESS : door.width}
-                    fill={isOpen ? "#e8b878" : "#c8923a"}
-                    fillOpacity="0.9"
-                    stroke="#a06828"
-                    strokeWidth={0.8 / z}
-                    rx={1 / z}
-                  />
-                  {/* Knob */}
-                  <circle
-                    cx={isH ? t.x + door.width * 0.8 : t.x + WALL_THICKNESS / 2}
-                    cy={isH ? t.y + WALL_THICKNESS / 2 : t.y + door.width * 0.8}
-                    r={3.5 / z}
-                    fill="#c8a840"
-                    stroke="#806010"
-                    strokeWidth={0.5 / z}
-                  />
-                </g>
-
-                {/* Swing arc */}
-                {!isOpen && (
-                  <path
-                    d={
-                      isH
-                        ? `M${t.x} ${t.y + WALL_THICKNESS / 2} A${arc} ${arc} 0 0 1 ${t.x} ${t.y + WALL_THICKNESS / 2 - arc}`
-                        : `M${t.x + WALL_THICKNESS / 2} ${t.y} A${arc} ${arc} 0 0 0 ${t.x + WALL_THICKNESS / 2 + arc} ${t.y}`
-                    }
-                    fill="rgba(200,146,58,0.08)"
-                    stroke="#a06828"
-                    strokeWidth={0.6 / z}
-                    strokeDasharray={`${2.5 / z} ${2 / z}`}
-                    pointerEvents="none"
-                  />
+                {/* AutoCAD Wall Jamb Caps */}
+                {isH ? (
+                  <>
+                    <rect x={t.x - 2} y={t.y - 3} width={4} height={WALL_THICKNESS + 6} fill={themeColors.doorJamb} />
+                    <rect x={t.x + door.width - 2} y={t.y - 3} width={4} height={WALL_THICKNESS + 6} fill={themeColors.doorJamb} />
+                  </>
+                ) : (
+                  <>
+                    <rect x={t.x - 3} y={t.y - 2} width={WALL_THICKNESS + 6} height={4} fill={themeColors.doorJamb} />
+                    <rect x={t.x - 3} y={t.y + door.width - 2} width={WALL_THICKNESS + 6} height={4} fill={themeColors.doorJamb} />
+                  </>
                 )}
 
-                {/* Status Indicator */}
-                <text
-                  x={isH ? t.x + door.width / 2 : t.x + WALL_THICKNESS / 2}
-                  y={isH ? t.y - 6 / z : t.y - 6 / z}
-                  textAnchor="middle"
-                  fill={isOpen ? "#16a34a" : "#c8923a"}
-                  fontSize={Math.max(5, 8 / z)}
-                  fontFamily="Inter"
-                  fontWeight="700"
-                  pointerEvents="none"
-                >
-                  {isOpen ? "▲ OPEN" : "▼ CLOSED"}
-                </text>
+                {/* Architectural Door Swing Graphic */}
+                {isDouble ? (
+                  // Double Door Swing (Entrance)
+                  <>
+                    <path
+                      d={`M ${t.x + leafLength} ${t.y + WALL_THICKNESS} A ${leafLength} ${leafLength} 0 0 0 ${t.x} ${t.y + WALL_THICKNESS - leafLength} M ${t.x + leafLength} ${t.y + WALL_THICKNESS} A ${leafLength} ${leafLength} 0 0 1 ${t.x + door.width} ${t.y + WALL_THICKNESS - leafLength}`}
+                      fill="none"
+                      stroke={themeColors.doorArc}
+                      strokeWidth={1.2 / z}
+                      strokeDasharray={isOpen ? `${3 / z} ${2 / z}` : undefined}
+                    />
+                    <line
+                      x1={t.x}
+                      y1={t.y + WALL_THICKNESS / 2}
+                      x2={isOpen ? t.x : t.x + leafLength}
+                      y2={isOpen ? t.y + WALL_THICKNESS / 2 - leafLength : t.y + WALL_THICKNESS / 2}
+                      stroke={themeColors.doorLeaf}
+                      strokeWidth={2.5 / z}
+                    />
+                    <line
+                      x1={t.x + door.width}
+                      y1={t.y + WALL_THICKNESS / 2}
+                      x2={isOpen ? t.x + door.width : t.x + leafLength}
+                      y2={isOpen ? t.y + WALL_THICKNESS / 2 - leafLength : t.y + WALL_THICKNESS / 2}
+                      stroke={themeColors.doorLeaf}
+                      strokeWidth={2.5 / z}
+                    />
+                  </>
+                ) : (
+                  // Single Door Swing
+                  <>
+                    <path
+                      d={arcPath}
+                      fill="none"
+                      stroke={themeColors.doorArc}
+                      strokeWidth={1.2 / z}
+                      strokeDasharray={isOpen ? `${3 / z} ${2 / z}` : undefined}
+                    />
+                    <line
+                      x1={hingeX}
+                      y1={hingeY}
+                      x2={isOpen ? openTipX : closedTipX}
+                      y2={isOpen ? openTipY : closedTipY}
+                      stroke={themeColors.doorLeaf}
+                      strokeWidth={2.5 / z}
+                    />
+                  </>
+                )}
               </g>
             );
           })}
 
-          {/* Windows — clickable to unlock/open with sliding sashes */}
+          {/* Windows — AutoCAD Glass Sash Line Graphics */}
           {windows.map((win) => {
             const room = rooms.find((r) => r.id === win.roomId);
             if (!room || room.floor !== activeFloor) return null;
@@ -1197,16 +1358,16 @@ export default function Canvas2D() {
                   }
                 }}
               >
-                {/* Wall gap */}
+                {/* Wall Opening Gap */}
                 <rect
                   x={t.x}
                   y={t.y}
                   width={t.w}
                   height={t.h}
-                  fill={room.color}
+                  fill={themeColors.roomFillStd}
                 />
 
-                {/* Selection highlight */}
+                {/* Selection Highlight */}
                 {isSel && (
                   <rect
                     x={t.x - 4 / z}
@@ -1221,82 +1382,26 @@ export default function Canvas2D() {
                   />
                 )}
 
-                {/* Window glass pane & frame */}
-                <rect
-                  x={t.x}
-                  y={t.y}
-                  width={t.w}
-                  height={t.h}
-                  fill={
-                    isOpen
-                      ? "rgba(74, 222, 128, 0.35)"
-                      : "rgba(168, 216, 240, 0.65)"
-                  }
-                  stroke={isOpen ? "#16a34a" : "#5ab0e0"}
-                  strokeWidth={1.2 / z}
-                  rx={1 / z}
-                />
-
-                {/* Pane division lines */}
+                {/* Jamb Caps */}
                 {isH ? (
                   <>
-                    <line
-                      x1={t.x + (isOpen ? win.width * 0.25 : win.width / 2)}
-                      y1={t.y}
-                      x2={t.x + (isOpen ? win.width * 0.25 : win.width / 2)}
-                      y2={t.y + WALL_THICKNESS}
-                      stroke="#5ab0e0"
-                      strokeWidth={1 / z}
-                    />
-                    {isOpen && (
-                      <line
-                        x1={t.x + win.width * 0.75}
-                        y1={t.y}
-                        x2={t.x + win.width * 0.75}
-                        y2={t.y + WALL_THICKNESS}
-                        stroke="#16a34a"
-                        strokeWidth={1 / z}
-                        strokeDasharray={`${2 / z} ${1 / z}`}
-                      />
-                    )}
+                    <line x1={t.x} y1={t.y - 2} x2={t.x} y2={t.y + WALL_THICKNESS + 2} stroke={themeColors.wallStroke} strokeWidth={2.5 / z} />
+                    <line x1={t.x + win.width} y1={t.y - 2} x2={t.x + win.width} y2={t.y + WALL_THICKNESS + 2} stroke={themeColors.wallStroke} strokeWidth={2.5 / z} />
+                    {/* Glass Panes */}
+                    <line x1={t.x} y1={t.y + 3} x2={t.x + win.width} y2={t.y + 3} stroke={themeColors.windowPane} strokeWidth={1.2 / z} />
+                    <line x1={t.x} y1={t.y + WALL_THICKNESS - 3} x2={t.x + win.width} y2={t.y + WALL_THICKNESS - 3} stroke={themeColors.windowPane} strokeWidth={1.2 / z} />
+                    <line x1={t.x} y1={t.y + WALL_THICKNESS / 2} x2={t.x + win.width} y2={t.y + WALL_THICKNESS / 2} stroke={themeColors.windowPane} strokeWidth={0.8 / z} strokeDasharray="4 2" />
                   </>
                 ) : (
                   <>
-                    <line
-                      x1={t.x}
-                      y1={t.y + (isOpen ? win.width * 0.25 : win.width / 2)}
-                      x2={t.x + WALL_THICKNESS}
-                      y2={t.y + (isOpen ? win.width * 0.25 : win.width / 2)}
-                      stroke="#5ab0e0"
-                      strokeWidth={1 / z}
-                    />
-                    {isOpen && (
-                      <line
-                        x1={t.x}
-                        y1={t.y + win.width * 0.75}
-                        x2={t.x + WALL_THICKNESS}
-                        y2={t.y + win.width * 0.75}
-                        stroke="#16a34a"
-                        strokeWidth={1 / z}
-                        strokeDasharray={`${2 / z} ${1 / z}`}
-                      />
-                    )}
+                    <line x1={t.x - 2} y1={t.y} x2={t.x + WALL_THICKNESS + 2} y2={t.y} stroke={themeColors.wallStroke} strokeWidth={2.5 / z} />
+                    <line x1={t.x - 2} y1={t.y + win.width} x2={t.x + WALL_THICKNESS + 2} y2={t.y + win.width} stroke={themeColors.wallStroke} strokeWidth={2.5 / z} />
+                    {/* Glass Panes */}
+                    <line x1={t.x + 3} y1={t.y} x2={t.x + 3} y2={t.y + win.width} stroke={themeColors.windowPane} strokeWidth={1.2 / z} />
+                    <line x1={t.x + WALL_THICKNESS - 3} y1={t.y} x2={t.x + WALL_THICKNESS - 3} y2={t.y + win.width} stroke={themeColors.windowPane} strokeWidth={1.2 / z} />
+                    <line x1={t.x + WALL_THICKNESS / 2} y1={t.y} x2={t.x + WALL_THICKNESS / 2} y2={t.y + win.width} stroke={themeColors.windowPane} strokeWidth={0.8 / z} strokeDasharray="4 2" />
                   </>
                 )}
-
-                {/* Window status badge */}
-                <text
-                  x={isH ? t.x + win.width / 2 : t.x + WALL_THICKNESS / 2}
-                  y={isH ? t.y - 6 / z : t.y - 6 / z}
-                  textAnchor="middle"
-                  fill={isOpen ? "#16a34a" : "#0284c7"}
-                  fontSize={Math.max(5, 8 / z)}
-                  fontFamily="Inter"
-                  fontWeight="700"
-                  pointerEvents="none"
-                >
-                  {isOpen ? "🔓 UNLOCKED" : "🔒 LOCKED"}
-                </text>
               </g>
             );
           })}
@@ -1308,6 +1413,7 @@ export default function Canvas2D() {
               item={f}
               selected={selectedId === f.id}
               z={z}
+              themeColors={themeColors}
               onMouseDown={(e) => onMouseDownFurniture(e, f)}
               onClick={(e) => {
                 e.stopPropagation();
@@ -1713,537 +1819,182 @@ function ToolHint({ children }) {
   );
 }
 
-function Furniture2D({ item, selected, z, onClick, onMouseDown }) {
-  const { x, y, width: w, height: h, color, label, type, rotation = 0 } = item;
+function Furniture2D({ item, selected, z, themeColors, onClick, onMouseDown }) {
+  const { x, y, width: w, height: h, label, type, rotation = 0 } = item;
   const rot = rotation || 0;
   const cx = x + w / 2;
   const cy = y + h / 2;
 
+  const fFill = themeColors?.furnFill || "#ffffff";
+  const fStroke = themeColors?.furnStroke || "#181818";
+  const fText = themeColors?.furnText || "#111111";
+
   const renderDetails = () => {
     switch (type) {
-      case "sofa":
+      case "plant":
+        // Starburst Radial Leaves Plant (as in architectural drawing)
         return (
-          <>
-            <rect
-              x={x}
-              y={y}
-              width={w}
-              height={h}
-              fill={color}
-              rx={6 / z}
-              stroke="rgba(0,0,0,0.3)"
-              strokeWidth={1 / z}
+          <g>
+            {/* Outer Starburst Leaf Ring */}
+            <path
+              d={`
+                M ${cx} ${cy - h * 0.48}
+                L ${cx + w * 0.1} ${cy - h * 0.2}
+                L ${cx + w * 0.35} ${cy - h * 0.35}
+                L ${cx + w * 0.2} ${cy - h * 0.1}
+                L ${cx + w * 0.48} ${cy}
+                L ${cx + w * 0.2} ${cy + h * 0.1}
+                L ${cx + w * 0.35} ${cy + h * 0.35}
+                L ${cx + w * 0.1} ${cy + h * 0.2}
+                L ${cx} ${cy + h * 0.48}
+                L ${cx - w * 0.1} ${cy + h * 0.2}
+                L ${cx - w * 0.35} ${cy + h * 0.35}
+                L ${cx - w * 0.2} ${cy + h * 0.1}
+                L ${cx - w * 0.48} ${cy}
+                L ${cx - w * 0.2} ${cy - h * 0.1}
+                L ${cx - w * 0.35} ${cy - h * 0.35}
+                L ${cx - w * 0.1} ${cy - h * 0.2}
+                Z
+              `}
+              fill="#8ab470"
+              stroke="#213d10"
+              strokeWidth={1.2 / z}
             />
-            <rect
-              x={x + 2}
-              y={y + 2}
-              width={w - 4}
-              height={h * 0.3}
-              fill="rgba(0,0,0,0.15)"
-              rx={3 / z}
-            />
-            <rect
-              x={x + 2}
-              y={y + 2}
-              width={w * 0.15}
-              height={h - 4}
-              fill="rgba(0,0,0,0.12)"
-              rx={3 / z}
-            />
-            <rect
-              x={x + w - w * 0.15 - 2}
-              y={y + 2}
-              width={w * 0.15}
-              height={h - 4}
-              fill="rgba(0,0,0,0.12)"
-              rx={3 / z}
-            />
-            <rect
-              x={x + w * 0.18}
-              y={y + h * 0.32}
-              width={(w * 0.64) / 2 - 2}
-              height={h * 0.6}
-              fill="rgba(255,255,255,0.2)"
-              rx={3 / z}
-            />
-            <rect
-              x={x + w * 0.18 + (w * 0.64) / 2 + 1}
-              y={y + h * 0.32}
-              width={(w * 0.64) / 2 - 2}
-              height={h * 0.6}
-              fill="rgba(255,255,255,0.2)"
-              rx={3 / z}
-            />
-          </>
+            {/* Inner Leaf Accent Ring */}
+            <circle cx={cx} cy={cy} r={Math.min(w, h) * 0.25} fill="#629248" stroke="#162c0b" strokeWidth={1 / z} />
+            {/* Center Pot */}
+            <circle cx={cx} cy={cy} r={Math.min(w, h) * 0.14} fill="#c89250" stroke="#603810" strokeWidth={1 / z} />
+          </g>
         );
 
-      case "sofa_sectional":
+      case "stairs":
+        // Architectural Staircase with Treads and Direction Arrow
+        const stepCount = 8;
+        const stepH = h / stepCount;
         return (
-          <>
-            <rect
-              x={x}
-              y={y}
-              width={w}
-              height={h}
-              fill={color}
-              rx={6 / z}
-              stroke="rgba(0,0,0,0.3)"
-              strokeWidth={1 / z}
-            />
-            <rect
-              x={x + 2}
-              y={y + 2}
-              width={w - 4}
-              height={h * 0.25}
-              fill="rgba(0,0,0,0.15)"
-              rx={3 / z}
-            />
-            <rect
-              x={x + w * 0.65}
-              y={y + 2}
-              width={w * 0.32}
-              height={h - 4}
-              fill="rgba(0,0,0,0.15)"
-              rx={3 / z}
-            />
-            <rect
-              x={x + 2}
-              y={y + 2}
-              width={w * 0.12}
-              height={h * 0.75}
-              fill="rgba(0,0,0,0.12)"
-              rx={2 / z}
-            />
-          </>
+          <g>
+            <rect x={x} y={y} width={w} height={h} fill={fFill} stroke={fStroke} strokeWidth={1.5 / z} />
+            {Array.from({ length: stepCount }).map((_, i) => (
+              <line
+                key={i}
+                x1={x}
+                y1={y + i * stepH}
+                x2={x + w}
+                y2={y + i * stepH}
+                stroke={fStroke}
+                strokeWidth={1.2 / z}
+              />
+            ))}
+            {/* Center Handrail & UP Arrow */}
+            <line x1={cx} y1={y + h * 0.85} x2={cx} y2={y + h * 0.15} stroke={fStroke} strokeWidth={1.5 / z} />
+            <path d={`M ${cx - 8} ${y + h * 0.3} L ${cx} ${y + h * 0.15} L ${cx + 8} ${y + h * 0.3}`} fill="none" stroke={fStroke} strokeWidth={1.8 / z} />
+            <text x={cx} y={y + h * 0.95} textAnchor="middle" fill={fText} fontSize={Math.max(6, 9 / z)} fontWeight="700" fontFamily="Inter">UP ↑</text>
+          </g>
+        );
+
+      case "sofa":
+        return (
+          <g>
+            {/* Outer Frame */}
+            <rect x={x} y={y} width={w} height={h} fill={fFill} stroke={fStroke} strokeWidth={1.5 / z} rx={3 / z} />
+            {/* Backrest Cushion */}
+            <rect x={x + 2} y={y + 2} width={w - 4} height={h * 0.28} fill={fFill} stroke={fStroke} strokeWidth={1.2 / z} rx={2 / z} />
+            {/* Armrests */}
+            <rect x={x + 2} y={y + 2} width={w * 0.16} height={h - 4} fill={fFill} stroke={fStroke} strokeWidth={1.2 / z} rx={2 / z} />
+            <rect x={x + w - w * 0.16 - 2} y={y + 2} width={w * 0.16} height={h - 4} fill={fFill} stroke={fStroke} strokeWidth={1.2 / z} rx={2 / z} />
+            {/* Seat Cushions */}
+            <rect x={x + w * 0.18} y={y + h * 0.3} width={(w * 0.64) / 2 - 1} height={h * 0.65} fill={fFill} stroke={fStroke} strokeWidth={1 / z} rx={2 / z} />
+            <rect x={x + w * 0.18 + (w * 0.64) / 2 + 1} y={y + h * 0.3} width={(w * 0.64) / 2 - 1} height={h * 0.65} fill={fFill} stroke={fStroke} strokeWidth={1 / z} rx={2 / z} />
+          </g>
         );
 
       case "armchair":
         return (
-          <>
-            <rect
-              x={x}
-              y={y}
-              width={w}
-              height={h}
-              fill={color}
-              rx={6 / z}
-              stroke="rgba(0,0,0,0.3)"
-              strokeWidth={1 / z}
-            />
-            <rect
-              x={x + 3}
-              y={y + 3}
-              width={w - 6}
-              height={h * 0.3}
-              fill="rgba(0,0,0,0.15)"
-              rx={3 / z}
-            />
-            <rect
-              x={x + 3}
-              y={y + 3}
-              width={w * 0.2}
-              height={h - 6}
-              fill="rgba(0,0,0,0.12)"
-              rx={3 / z}
-            />
-            <rect
-              x={x + w - w * 0.2 - 3}
-              y={y + 3}
-              width={w * 0.2}
-              height={h - 6}
-              fill="rgba(0,0,0,0.12)"
-              rx={3 / z}
-            />
-            <rect
-              x={x + w * 0.22}
-              y={y + h * 0.33}
-              width={w * 0.56}
-              height={h * 0.6}
-              fill="rgba(255,255,255,0.25)"
-              rx={4 / z}
-            />
-          </>
+          <g>
+            <rect x={x} y={y} width={w} height={h} fill={fFill} stroke={fStroke} strokeWidth={1.5 / z} rx={3 / z} />
+            <rect x={x + 3} y={y + 3} width={w - 6} height={h * 0.3} fill={fFill} stroke={fStroke} strokeWidth={1.2 / z} rx={2 / z} />
+            <rect x={x + 3} y={y + 3} width={w * 0.22} height={h - 6} fill={fFill} stroke={fStroke} strokeWidth={1.2 / z} rx={2 / z} />
+            <rect x={x + w - w * 0.22 - 3} y={y + 3} width={w * 0.22} height={h - 6} fill={fFill} stroke={fStroke} strokeWidth={1.2 / z} rx={2 / z} />
+            <rect x={x + w * 0.24} y={y + h * 0.32} width={w * 0.52} height={h * 0.62} fill={fFill} stroke={fStroke} strokeWidth={1 / z} rx={2 / z} />
+          </g>
         );
 
-      case "bed_single":
-      case "bed_double":
-      case "bed_queen":
       case "bed_king":
-      case "bed_bunk":
+      case "bed_queen":
+      case "bed_double":
+      case "bed_single":
       case "bed":
-        const isKingQueen =
-          type === "bed_queen" || type === "bed_king" || type === "bed_double";
+        const isKingQueen = type === "bed_king" || type === "bed_queen" || type === "bed_double";
         return (
-          <>
-            <rect
-              x={x}
-              y={y}
-              width={w}
-              height={h}
-              fill={color}
-              rx={5 / z}
-              stroke="rgba(0,0,0,0.3)"
-              strokeWidth={1 / z}
-            />
-            <rect
-              x={x + 2}
-              y={y + 2}
-              width={w - 4}
-              height={h * 0.12}
-              fill="rgba(0,0,0,0.25)"
-              rx={2 / z}
-            />
-            <rect
-              x={x + 4}
-              y={y + h * 0.14}
-              width={w - 8}
-              height={h * 0.82}
-              fill="rgba(255,255,255,0.85)"
-              rx={3 / z}
-            />
+          <g>
+            {/* Outer Frame */}
+            <rect x={x} y={y} width={w} height={h} fill={fFill} stroke={fStroke} strokeWidth={1.5 / z} rx={2 / z} />
+            {/* Headboard */}
+            <rect x={x + 2} y={y + 2} width={w - 4} height={h * 0.08} fill={fStroke} />
+            {/* Mattress */}
+            <rect x={x + 4} y={y + h * 0.1} width={w - 8} height={h * 0.86} fill={fFill} stroke={fStroke} strokeWidth={1 / z} rx={2 / z} />
+            {/* Pillows */}
             {isKingQueen ? (
               <>
-                <rect
-                  x={x + w * 0.1}
-                  y={y + h * 0.18}
-                  width={w * 0.36}
-                  height={h * 0.18}
-                  fill="#f5f5f5"
-                  stroke="#ccc"
-                  strokeWidth={0.5 / z}
-                  rx={3 / z}
-                />
-                <rect
-                  x={x + w * 0.54}
-                  y={y + h * 0.18}
-                  width={w * 0.36}
-                  height={h * 0.18}
-                  fill="#f5f5f5"
-                  stroke="#ccc"
-                  strokeWidth={0.5 / z}
-                  rx={3 / z}
-                />
+                <rect x={x + w * 0.08} y={y + h * 0.14} width={w * 0.38} height={h * 0.18} fill={fFill} stroke={fStroke} strokeWidth={1 / z} rx={3 / z} />
+                <rect x={x + w * 0.54} y={y + h * 0.14} width={w * 0.38} height={h * 0.18} fill={fFill} stroke={fStroke} strokeWidth={1 / z} rx={3 / z} />
               </>
             ) : (
-              <rect
-                x={x + w * 0.2}
-                y={y + h * 0.18}
-                width={w * 0.6}
-                height={h * 0.18}
-                fill="#f5f5f5"
-                stroke="#ccc"
-                strokeWidth={0.5 / z}
-                rx={3 / z}
-              />
+              <rect x={x + w * 0.2} y={y + h * 0.14} width={w * 0.6} height={h * 0.18} fill={fFill} stroke={fStroke} strokeWidth={1 / z} rx={3 / z} />
             )}
-            <rect
-              x={x + 4}
-              y={y + h * 0.42}
-              width={w - 8}
-              height={h * 0.54}
-              fill={color}
-              fillOpacity="0.6"
-              rx={2 / z}
-            />
-            <line
-              x1={x + 4}
-              y1={y + h * 0.42}
-              x2={x + w - 4}
-              y2={y + h * 0.42}
-              stroke="rgba(0,0,0,0.2)"
-              strokeWidth={1.5 / z}
-            />
-            {type === "bed_bunk" && (
-              <text
-                x={x + w / 2}
-                y={y + h * 0.75}
-                textAnchor="middle"
-                fill="#fff"
-                fontSize={Math.max(6, 8 / z)}
-                fontWeight="bold"
-              >
-                BUNK
-              </text>
-            )}
-          </>
+            {/* Folded Duvet Line */}
+            <line x1={x + 4} y1={y + h * 0.38} x2={x + w - 4} y2={y + h * 0.38} stroke={fStroke} strokeWidth={1.2 / z} strokeDasharray="6 3" />
+          </g>
         );
 
-      case "dining_4":
       case "dining_6":
-      case "table":
-        const chairCount = type === "dining_6" ? 6 : 4;
+      case "dining_4":
         return (
-          <>
-            <rect
-              x={x + w * 0.15}
-              y={y + h * 0.15}
-              width={w * 0.7}
-              height={h * 0.7}
-              fill={color}
-              rx={4 / z}
-              stroke="rgba(0,0,0,0.3)"
-              strokeWidth={1 / z}
-            />
-            <rect
-              x={x + w * 0.25}
-              y={y}
-              width={w * 0.2}
-              height={h * 0.12}
-              fill="#5d4037"
-              rx={2 / z}
-            />
-            <rect
-              x={x + w * 0.55}
-              y={y}
-              width={w * 0.2}
-              height={h * 0.12}
-              fill="#5d4037"
-              rx={2 / z}
-            />
-            <rect
-              x={x + w * 0.25}
-              y={y + h * 0.88}
-              width={w * 0.2}
-              height={h * 0.12}
-              fill="#5d4037"
-              rx={2 / z}
-            />
-            <rect
-              x={x + w * 0.55}
-              y={y + h * 0.88}
-              width={w * 0.2}
-              height={h * 0.12}
-              fill="#5d4037"
-              rx={2 / z}
-            />
-            {chairCount === 6 && (
-              <>
-                <rect
-                  x={x}
-                  y={y + h * 0.35}
-                  width={w * 0.12}
-                  height={h * 0.3}
-                  fill="#5d4037"
-                  rx={2 / z}
-                />
-                <rect
-                  x={x + w * 0.88}
-                  y={y + h * 0.35}
-                  width={w * 0.88}
-                  height={h * 0.3}
-                  fill="#5d4037"
-                  rx={2 / z}
-                />
-              </>
-            )}
-          </>
+          <g>
+            {/* Dining Table */}
+            <rect x={x + w * 0.18} y={y + h * 0.15} width={w * 0.64} height={h * 0.7} fill={fFill} stroke={fStroke} strokeWidth={1.5 / z} rx={3 / z} />
+            {/* Top Chairs */}
+            <rect x={x + w * 0.22} y={y} width={w * 0.16} height={h * 0.12} fill={fFill} stroke={fStroke} strokeWidth={1.2 / z} rx={3 / z} />
+            <rect x={x + w * 0.42} y={y} width={w * 0.16} height={h * 0.12} fill={fFill} stroke={fStroke} strokeWidth={1.2 / z} rx={3 / z} />
+            <rect x={x + w * 0.62} y={y} width={w * 0.16} height={h * 0.12} fill={fFill} stroke={fStroke} strokeWidth={1.2 / z} rx={3 / z} />
+            {/* Bottom Chairs */}
+            <rect x={x + w * 0.22} y={y + h * 0.88} width={w * 0.16} height={h * 0.12} fill={fFill} stroke={fStroke} strokeWidth={1.2 / z} rx={3 / z} />
+            <rect x={x + w * 0.42} y={y + h * 0.88} width={w * 0.16} height={h * 0.12} fill={fFill} stroke={fStroke} strokeWidth={1.2 / z} rx={3 / z} />
+            <rect x={x + w * 0.62} y={y + h * 0.88} width={w * 0.16} height={h * 0.12} fill={fFill} stroke={fStroke} strokeWidth={1.2 / z} rx={3 / z} />
+          </g>
         );
 
-      case "table_coffee":
-      case "desk":
       case "nightstand":
         return (
-          <>
-            <rect
-              x={x}
-              y={y}
-              width={w}
-              height={h}
-              fill={color}
-              rx={4 / z}
-              stroke="rgba(0,0,0,0.3)"
-              strokeWidth={1 / z}
-            />
-            <rect
-              x={x + 3}
-              y={y + 3}
-              width={w - 6}
-              height={h - 6}
-              fill="none"
-              stroke="rgba(255,255,255,0.3)"
-              strokeWidth={1 / z}
-              rx={2 / z}
-            />
-            {type === "desk" && (
-              <>
-                <rect
-                  x={x + w * 0.3}
-                  y={y + h * 0.2}
-                  width={w * 0.4}
-                  height={h * 0.3}
-                  fill="#333"
-                  rx={1 / z}
-                />
-                <rect
-                  x={x + w * 0.72}
-                  y={y + 4}
-                  width={w * 0.24}
-                  height={h - 8}
-                  fill="rgba(0,0,0,0.15)"
-                  rx={2 / z}
-                />
-              </>
-            )}
-            {type === "nightstand" && (
-              <circle
-                cx={x + w / 2}
-                cy={y + h / 2}
-                r={3 / z}
-                fill="rgba(0,0,0,0.3)"
-              />
-            )}
-          </>
-        );
-
-      case "wardrobe":
-        return (
-          <>
-            <rect
-              x={x}
-              y={y}
-              width={w}
-              height={h}
-              fill={color}
-              rx={2 / z}
-              stroke="rgba(0,0,0,0.4)"
-              strokeWidth={1 / z}
-            />
-            <line
-              x1={x + w / 2}
-              y1={y + 2}
-              x2={x + w / 2}
-              y2={y + h - 2}
-              stroke="rgba(0,0,0,0.3)"
-              strokeWidth={1 / z}
-            />
-            <rect
-              x={x + w * 0.45}
-              y={y + h * 0.4}
-              width={w * 0.03}
-              height={h * 0.2}
-              fill="#c8a840"
-            />
-            <rect
-              x={x + w * 0.52}
-              y={y + h * 0.4}
-              width={w * 0.03}
-              height={h * 0.2}
-              fill="#c8a840"
-            />
-          </>
-        );
-
-      case "shoerack":
-        return (
-          <>
-            <rect
-              x={x}
-              y={y}
-              width={w}
-              height={h}
-              fill={color}
-              rx={2 / z}
-              stroke="rgba(0,0,0,0.4)"
-              strokeWidth={1 / z}
-            />
-            {[0.25, 0.5, 0.75].map((p, i) => (
-              <line
-                key={i}
-                x1={x + 4}
-                y1={y + h * p}
-                x2={x + w - 4}
-                y2={y + h * p}
-                stroke="rgba(255,255,255,0.25)"
-                strokeWidth={1 / z}
-              />
-            ))}
-          </>
+          <g>
+            <rect x={x} y={y} width={w} height={h} fill={fFill} stroke={fStroke} strokeWidth={1.2 / z} rx={2 / z} />
+            <circle cx={cx} cy={cy} r={Math.min(w, h) * 0.2} fill={fFill} stroke={fStroke} strokeWidth={1 / z} />
+          </g>
         );
 
       case "tv_unit":
-      case "tv":
         return (
-          <>
-            <rect
-              x={x}
-              y={y}
-              width={w}
-              height={h}
-              fill={color}
-              rx={3 / z}
-              stroke="rgba(0,0,0,0.4)"
-              strokeWidth={1 / z}
-            />
-            <rect
-              x={x + w * 0.1}
-              y={y + h * 0.35}
-              width={w * 0.8}
-              height={h * 0.3}
-              fill="#000"
-              rx={1 / z}
-              stroke="#444"
-              strokeWidth={0.5 / z}
-            />
-          </>
+          <g>
+            <rect x={x} y={y} width={w} height={h} fill={fFill} stroke={fStroke} strokeWidth={1.5 / z} rx={2 / z} />
+            <rect x={x + w * 0.2} y={y + 4} width={w * 0.6} height={h - 8} fill={fStroke} rx={1 / z} />
+          </g>
         );
 
-      case "door_single":
-      case "door_double":
-        const isDouble = type === "door_double";
+      case "desk":
+        // Kitchen Counter / Sink / Desk
         return (
-          <>
-            <rect
-              x={x}
-              y={y}
-              width={w}
-              height={h}
-              fill={color}
-              fillOpacity="0.3"
-              stroke={color}
-              strokeWidth={1.5 / z}
-              rx={2 / z}
-            />
-            {isDouble ? (
-              <>
-                <path
-                  d={`M ${x} ${y + h} A ${w / 2} ${w / 2} 0 0 1 ${x + w / 2} ${y + h - w / 2}`}
-                  fill="none"
-                  stroke={color}
-                  strokeDasharray={`${3 / z} ${2 / z}`}
-                  strokeWidth={1 / z}
-                />
-                <path
-                  d={`M ${x + w} ${y + h} A ${w / 2} ${w / 2} 0 0 0 ${x + w / 2} ${y + h - w / 2}`}
-                  fill="none"
-                  stroke={color}
-                  strokeDasharray={`${3 / z} ${2 / z}`}
-                  strokeWidth={1 / z}
-                />
-              </>
-            ) : (
-              <path
-                d={`M ${x} ${y + h} A ${w} ${w} 0 0 1 ${x + w} ${y + h - w}`}
-                fill="none"
-                stroke={color}
-                strokeDasharray={`${3 / z} ${2 / z}`}
-                strokeWidth={1 / z}
-              />
-            )}
-          </>
+          <g>
+            <rect x={x} y={y} width={w} height={h} fill={fFill} stroke={fStroke} strokeWidth={1.5 / z} rx={2 / z} />
+            {/* Double Basin Sink Bowls */}
+            <rect x={x + 10} y={y + 6} width={w * 0.38} height={h - 12} fill={fFill} stroke={fStroke} strokeWidth={1 / z} rx={4 / z} />
+            <rect x={x + 10 + w * 0.42} y={y + 6} width={w * 0.38} height={h - 12} fill={fFill} stroke={fStroke} strokeWidth={1 / z} rx={4 / z} />
+            <circle cx={x + 10 + w * 0.4} cy={cy} r={4 / z} fill={fStroke} />
+          </g>
         );
 
       default:
         return (
-          <rect
-            x={x}
-            y={y}
-            width={w}
-            height={h}
-            fill={color}
-            rx={4 / z}
-            stroke="rgba(0,0,0,0.3)"
-            strokeWidth={1 / z}
-          />
+          <rect x={x} y={y} width={w} height={h} fill={fFill} stroke={fStroke} strokeWidth={1.5 / z} rx={2 / z} />
         );
     }
   };
@@ -2265,23 +2016,24 @@ function Furniture2D({ item, selected, z, onClick, onMouseDown }) {
           stroke="#4f8ef7"
           strokeWidth={2 / z}
           strokeDasharray={`${4 / z} ${2 / z}`}
-          rx={6 / z}
+          rx={4 / z}
         />
       )}
       {renderDetails()}
-      <text
-        x={cx}
-        y={cy + 3}
-        textAnchor="middle"
-        fill="#000"
-        fillOpacity="0.75"
-        fontSize={Math.max(6, 9 / z)}
-        fontWeight="600"
-        fontFamily="Inter, sans-serif"
-        pointerEvents="none"
-      >
-        {label}
-      </text>
+      {label && type !== "plant" && (
+        <text
+          x={cx}
+          y={cy + 3}
+          textAnchor="middle"
+          fill={fText}
+          fontSize={Math.max(6, 8 / z)}
+          fontWeight="600"
+          fontFamily="Inter, sans-serif"
+          pointerEvents="none"
+        >
+          {label}
+        </text>
+      )}
     </g>
   );
 }
