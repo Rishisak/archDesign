@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useDesignStore } from "../store/designStore";
 
 const ROOM_COLORS = [
@@ -103,7 +103,6 @@ export const LIBRARY_ITEMS = [
     h: 15,
     color: "#2196f3",
   },
-
 
   // ── Seating ──
   {
@@ -333,8 +332,285 @@ const AI_RESPONSES = [
   "For a modern open-plan feel, consider removing the wall between Kitchen and Living Room. This would increase natural light by approximately 40%.",
 ];
 
+// ─── Floors Manager Section on Right Panel ──────────────────────────────────
+function FloorsPanel() {
+  const {
+    floors,
+    activeFloor,
+    setActiveFloor,
+    addFloor,
+    deleteFloor,
+    renameFloor,
+    rooms,
+    setViewMode,
+  } = useDesignStore();
+
+  const [editingFloorId, setEditingFloorId] = useState(null);
+  const [editingName, setEditingName] = useState("");
+
+  const sortedFloors = [...floors].sort((a, b) => a.id - b.id);
+  const groundFloorId = sortedFloors[0]?.id;
+  const groundFloorHasRooms = rooms.some((r) => r.floor === groundFloorId);
+
+  const startRename = (f, e) => {
+    e.stopPropagation();
+    setEditingFloorId(f.id);
+    setEditingName(f.name);
+  };
+
+  const commitRename = () => {
+    if (editingFloorId !== null && editingName.trim()) {
+      renameFloor(editingFloorId, editingName.trim());
+    }
+    setEditingFloorId(null);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div className="section-header">🏢 Building Floors & Storeys</div>
+
+      {/* Info / Status Banner */}
+      <div
+        style={{
+          padding: "10px 12px",
+          borderRadius: "var(--radius-md)",
+          background: groundFloorHasRooms
+            ? "rgba(63,185,80,0.08)"
+            : "rgba(210,153,34,0.1)",
+          border: groundFloorHasRooms
+            ? "1px solid rgba(63,185,80,0.25)"
+            : "1px solid rgba(210,153,34,0.3)",
+          fontSize: 11,
+          lineHeight: 1.5,
+          color: groundFloorHasRooms ? "var(--green)" : "var(--orange)",
+        }}
+      >
+        {groundFloorHasRooms ? (
+          <span>
+            ✨ <strong>Ground layout ready!</strong> Upper floors automatically
+            inherit your ground floor room footprint as allowed building boundaries.
+          </span>
+        ) : (
+          <span>
+            ⚡ <strong>Setup hint:</strong> Design at least one room on the
+            Ground Floor to establish the building outline before adding upper floors.
+          </span>
+        )}
+      </div>
+
+      {/* Add New Floor Button */}
+      <button
+        onClick={() => {
+          if (!groundFloorHasRooms) {
+            alert(
+              "Please design at least one room on the Ground Floor first to establish the building footprint.",
+            );
+            return;
+          }
+          addFloor();
+        }}
+        style={{
+          width: "100%",
+          padding: "10px 14px",
+          borderRadius: "var(--radius-md)",
+          border: groundFloorHasRooms
+            ? "1px solid var(--accent)"
+            : "1px dashed var(--border)",
+          background: groundFloorHasRooms
+            ? "linear-gradient(135deg, rgba(79,142,247,0.2), rgba(188,140,255,0.15))"
+            : "var(--bg-tertiary)",
+          color: groundFloorHasRooms ? "var(--accent)" : "var(--text-muted)",
+          fontWeight: 600,
+          fontSize: 12,
+          cursor: groundFloorHasRooms ? "pointer" : "not-allowed",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          transition: "all 0.2s",
+        }}
+      >
+        <span>➕ Add New Floor</span>
+      </button>
+
+      {/* Floor Cards List */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {sortedFloors.map((f, idx) => {
+          const isActive = activeFloor === f.id;
+          const isGround = f.id === groundFloorId;
+          const isEditing = editingFloorId === f.id;
+          const floorRooms = rooms.filter((r) => r.floor === f.id);
+          const storeyHeightM = (idx * 3.0).toFixed(1);
+
+          return (
+            <div
+              key={f.id}
+              onClick={() => setActiveFloor(f.id)}
+              style={{
+                padding: "10px 12px",
+                borderRadius: "var(--radius-md)",
+                border: isActive
+                  ? "1.5px solid var(--accent)"
+                  : "1px solid var(--border)",
+                background: isActive
+                  ? "rgba(79,142,247,0.12)"
+                  : "var(--bg-tertiary)",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                transition: "all 0.2s",
+                boxShadow: isActive ? "0 2px 10px var(--accent-glow)" : "none",
+              }}
+            >
+              {/* Icon */}
+              <div
+                style={{
+                  fontSize: 18,
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  background: isActive ? "var(--accent)" : "var(--bg-quaternary)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                {isGround ? "🏠" : "🏢"}
+              </div>
+
+              {/* Title & info */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {isEditing ? (
+                  <input
+                    autoFocus
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onBlur={commitRename}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitRename();
+                      if (e.key === "Escape") setEditingFloorId(null);
+                    }}
+                    style={{
+                      background: "var(--bg-primary)",
+                      border: "1px solid var(--accent)",
+                      borderRadius: 4,
+                      color: "var(--text-primary)",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      padding: "2px 6px",
+                      width: "100%",
+                    }}
+                  />
+                ) : (
+                  <div
+                    onDoubleClick={(e) => startRename(f, e)}
+                    style={{
+                      fontSize: 13,
+                      fontWeight: isActive ? 700 : 500,
+                      color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {f.name}
+                  </div>
+                )}
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: "var(--text-muted)",
+                    marginTop: 2,
+                    display: "flex",
+                    gap: 8,
+                  }}
+                >
+                  <span>+{storeyHeightM}m elevation</span>
+                  <span>•</span>
+                  <span>{floorRooms.length} room{floorRooms.length === 1 ? "" : "s"}</span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                {!isEditing && (
+                  <button
+                    onClick={(e) => startRename(f, e)}
+                    title="Rename Floor"
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: "var(--text-muted)",
+                      cursor: "pointer",
+                      fontSize: 11,
+                      padding: "3px 4px",
+                    }}
+                  >
+                    ✏️
+                  </button>
+                )}
+
+                {!isGround && sortedFloors.length > 1 && !isEditing && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (
+                        window.confirm(
+                          `Are you sure you want to delete "${f.name}" and all its rooms?`,
+                        )
+                      ) {
+                        deleteFloor(f.id);
+                      }
+                    }}
+                    title="Delete Floor"
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: "var(--red)",
+                      cursor: "pointer",
+                      fontSize: 12,
+                      padding: "3px 4px",
+                    }}
+                  >
+                    🗑️
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* View all floors 3D button */}
+      <button
+        onClick={() => setViewMode("3d")}
+        style={{
+          width: "100%",
+          padding: "8px 12px",
+          borderRadius: "var(--radius-md)",
+          border: "1px solid var(--border)",
+          background: "var(--bg-tertiary)",
+          color: "var(--text-primary)",
+          fontSize: 11,
+          fontWeight: 600,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+          marginTop: 6,
+        }}
+      >
+        <span>◈ View Building in 3D</span>
+      </button>
+    </div>
+  );
+}
+
 function AIPanel() {
-  const { aiSuggestions, applySuggestion, dismissSuggestion, rooms } =
+  const { aiSuggestions, applySuggestion, dismissSuggestion } =
     useDesignStore();
   const [messages, setMessages] = useState([
     {
@@ -360,7 +636,6 @@ function AIPanel() {
 
   return (
     <div className="ai-chat">
-      {/* Suggestions */}
       {pending.length > 0 && (
         <div style={{ marginBottom: 8 }}>
           <div className="section-header">
@@ -427,32 +702,23 @@ function RoomsPanel() {
     windows,
     furniture,
     selectedId,
-    setSelectedId,
     updateRoom,
     deleteRoom,
     extendRoom,
     mergeRooms,
-    updateFurniture,
-    deleteFurniture,
-    updateDoor,
     deleteDoor,
-    updateWindow,
     deleteWindow,
     openDoors,
     toggleDoor,
-    openWindows,
-    toggleWindow,
     activeFloor,
   } = useDesignStore();
   const vis = rooms.filter((r) => r.floor === activeFloor);
   const selRoom = vis.find((r) => r.id === selectedId);
-  const selFurn = furniture.find((f) => f.id === selectedId);
   const selDoor = doors.find((d) => d.id === selectedId);
   const selWin = windows.find((w) => w.id === selectedId);
 
   return (
     <div>
-      {/* Inspector for selected item */}
       {selDoor && (
         <div
           style={{
@@ -476,17 +742,6 @@ function RoomsPanel() {
                 : "▼ Closed (Click to Open)"}
             </button>
           </div>
-          <div className="prop-group">
-            <div className="prop-label">Width (cm)</div>
-            <input
-              className="prop-input"
-              type="number"
-              value={selDoor.width}
-              onChange={(e) =>
-                updateDoor(selDoor.id, { width: +e.target.value })
-              }
-            />
-          </div>
           <button
             className="btn btn-danger w-full"
             style={{ width: "100%", justifyContent: "center", marginTop: 8 }}
@@ -508,40 +763,6 @@ function RoomsPanel() {
           }}
         >
           <div className="section-header">🪟 Selected Window</div>
-          <div className="prop-group">
-            <div className="prop-label">Status</div>
-            <button
-              className={`btn ${openWindows.has(selWin.id) ? "btn-success" : "btn-primary"}`}
-              style={{ width: "100%" }}
-              onClick={() => toggleWindow(selWin.id)}
-            >
-              {openWindows.has(selWin.id)
-                ? "🔓 Unlocked & Open (Click to Lock)"
-                : "🔒 Locked (Click to Unlock & Open)"}
-            </button>
-          </div>
-          <div className="prop-group" style={{ marginTop: 8 }}>
-            <div className="prop-label">Kinematic Mode</div>
-            <select
-              className="prop-input"
-              value={windowModes[selWin.id] || "sliding"}
-              onChange={() => toggleWindowMode(selWin.id)}
-            >
-              <option value="sliding">↔ Sliding Track</option>
-              <option value="casement">🚪 Casement Hinge (45° Tilt)</option>
-            </select>
-          </div>
-          <div className="prop-group">
-            <div className="prop-label">Width (cm)</div>
-            <input
-              className="prop-input"
-              type="number"
-              value={selWin.width}
-              onChange={(e) =>
-                updateWindow(selWin.id, { width: +e.target.value })
-              }
-            />
-          </div>
           <button
             className="btn btn-danger w-full"
             style={{ width: "100%", justifyContent: "center", marginTop: 8 }}
@@ -552,7 +773,7 @@ function RoomsPanel() {
         </div>
       )}
 
-      {selFurn && (
+      {selRoom && (
         <div
           style={{
             marginBottom: 12,
@@ -562,130 +783,25 @@ function RoomsPanel() {
             border: "1px solid var(--accent)",
           }}
         >
-          <div className="section-header">
-            🛋️ Selected Item: {selFurn.label}
-          </div>
+          <div className="section-header">🏠 Room Settings</div>
           <div className="prop-group">
-            <div className="prop-label">Label / Name</div>
-            <input
-              className="prop-input"
-              value={selFurn.label}
-              onChange={(e) =>
-                updateFurniture(selFurn.id, { label: e.target.value })
-              }
-            />
-          </div>
-          <div
-            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}
-          >
-            <div className="prop-group">
-              <div className="prop-label">Width (cm)</div>
-              <input
-                className="prop-input"
-                type="number"
-                value={selFurn.width}
-                onChange={(e) =>
-                  e.target.value !== "" && updateFurniture(selFurn.id, { width: +e.target.value })
-                }
-                onBlur={(e) => {
-                  const v = +e.target.value;
-                  if (!isNaN(v) && v > 0) updateFurniture(selFurn.id, { width: v });
-                }}
-              />
-            </div>
-            <div className="prop-group">
-              <div className="prop-label">Depth/Height (cm)</div>
-              <input
-                className="prop-input"
-                type="number"
-                value={selFurn.height}
-                onChange={(e) =>
-                  e.target.value !== "" && updateFurniture(selFurn.id, { height: +e.target.value })
-                }
-                onBlur={(e) => {
-                  const v = +e.target.value;
-                  if (!isNaN(v) && v > 0) updateFurniture(selFurn.id, { height: v });
-                }}
-              />
-            </div>
-          </div>
-          <div className="prop-group">
-            <div className="prop-label">Rotation (°)</div>
-            <input
-              className="prop-input"
-              type="number"
-              value={selFurn.rotation || 0}
-              step="15"
-              onChange={(e) =>
-                updateFurniture(selFurn.id, { rotation: +e.target.value })
-              }
-            />
-          </div>
-          <button
-            className="btn btn-danger w-full"
-            style={{ width: "100%", justifyContent: "center", marginTop: 8 }}
-            onClick={() => deleteFurniture(selFurn.id)}
-          >
-            🗑 Delete Item
-          </button>
-        </div>
-      )}
-
-      <div className="section-header">Rooms on This Floor ({vis.length})</div>
-      {vis.map((r) => (
-        <div
-          key={r.id}
-          className={`room-card ${selectedId === r.id ? "selected" : ""}`}
-          onClick={() => setSelectedId(r.id)}
-        >
-          <div className="room-swatch" style={{ background: r.color }} />
-          <div className="room-info">
-            <div className="room-name">{r.name}</div>
-            <div className="room-meta">
-              {(r.width / 100).toFixed(1)}m × {(r.height / 100).toFixed(1)}m ·{" "}
-              {((r.width / 100) * (r.height / 100)).toFixed(1)}m²
-            </div>
-          </div>
-          <div className="room-actions">
-            <button
-              className="btn btn-danger"
-              style={{ padding: "3px 7px" }}
-              onClick={(e) => {
-                e.stopPropagation();
-                deleteRoom(r.id);
-              }}
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      ))}
-
-      {selRoom && (
-        <div
-          style={{
-            marginTop: 12,
-            padding: 12,
-            background: "var(--bg-tertiary)",
-            borderRadius: "var(--radius-md)",
-            border: "1px solid var(--border)",
-          }}
-        >
-          <div className="section-header">Edit Room</div>
-          <div className="prop-group">
-            <div className="prop-label">Name</div>
+            <div className="prop-label">Room Name</div>
             <input
               className="prop-input"
               value={selRoom.name}
-              onChange={(e) => updateRoom(selRoom.id, { name: e.target.value })}
+              onChange={(e) =>
+                updateRoom(selRoom.id, { name: e.target.value })
+              }
             />
           </div>
           <div className="prop-group">
-            <div className="prop-label">Type</div>
+            <div className="prop-label">Room Type</div>
             <select
               className="prop-input"
-              value={selRoom.type ?? "room"}
-              onChange={(e) => updateRoom(selRoom.id, { type: e.target.value })}
+              value={selRoom.type || "room"}
+              onChange={(e) =>
+                updateRoom(selRoom.id, { type: e.target.value })
+              }
             >
               {ROOM_TYPES.map((t) => (
                 <option key={t} value={t}>
@@ -694,55 +810,39 @@ function RoomsPanel() {
               ))}
             </select>
           </div>
+
           <div className="prop-group">
-            <div className="prop-label">Fill Color</div>
-            <div className="color-row">
+            <div className="prop-label">Floor Color</div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(5, 1fr)",
+                gap: 4,
+              }}
+            >
               {ROOM_COLORS.map((c) => (
-                <div
+                <button
                   key={c}
-                  className={`color-swatch ${selRoom.color === c ? "selected" : ""}`}
-                  style={{ background: c }}
                   onClick={() => updateRoom(selRoom.id, { color: c })}
+                  style={{
+                    height: 24,
+                    borderRadius: 4,
+                    background: c,
+                    border:
+                      selRoom.color === c
+                        ? "2px solid var(--accent)"
+                        : "1px solid var(--border)",
+                    cursor: "pointer",
+                  }}
                 />
               ))}
             </div>
           </div>
-          <div
-            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}
-          >
-            <div className="prop-group">
-              <div className="prop-label">Width (cm)</div>
-              <input
-                className="prop-input"
-                type="number"
-                value={selRoom.width}
-                onChange={(e) =>
-                  updateRoom(selRoom.id, { width: +e.target.value })
-                }
-              />
-            </div>
-            <div className="prop-group">
-              <div className="prop-label">Height (cm)</div>
-              <input
-                className="prop-input"
-                type="number"
-                value={selRoom.height}
-                onChange={(e) =>
-                  updateRoom(selRoom.id, { height: +e.target.value })
-                }
-              />
-            </div>
-          </div>
 
-          {/* Quick Extend Room Buttons */}
           <div className="prop-group" style={{ marginTop: 8 }}>
-            <div className="prop-label">📐 Extend Room Dimension</div>
+            <div className="prop-label">📏 Extend Room Size</div>
             <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 4,
-              }}
+              style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}
             >
               <button
                 className="btn btn-secondary"
@@ -775,7 +875,6 @@ function RoomsPanel() {
             </div>
           </div>
 
-          {/* Join / Merge Rooms */}
           {vis.filter((r) => r.id !== selRoom.id).length > 0 && (
             <div className="prop-group" style={{ marginTop: 8 }}>
               <div className="prop-label">🔗 Join / Merge Room</div>
@@ -889,7 +988,7 @@ function LibraryPanel() {
 
   return (
     <div>
-      <div className="section-header">IKEA Furniture & Asset Library</div>
+      <div className="section-header">Furniture & Asset Library</div>
       <input
         className="prop-input"
         placeholder="🔍 Search furniture..."
@@ -898,7 +997,6 @@ function LibraryPanel() {
         style={{ marginBottom: 8 }}
       />
 
-      {/* Category Pills */}
       <div
         style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 12 }}
       >
@@ -1033,9 +1131,14 @@ function ThemePanel() {
   );
 }
 
-const TABS = ["Rooms", "AI Copilot", "Library", "Theme"];
+const TABS = [
+  { id: "floors", label: "🏢 Floors" },
+  { id: "rooms", label: "🏠 Rooms" },
+  { id: "library", label: "🛋️ Library" },
+  { id: "ai", label: "🤖 AI" },
+  { id: "theme", label: "🎨 Theme" },
+];
 
-// ─── Furniture colour presets ────────────────────────────────────────────────
 const FURN_COLORS = [
   "#546e7a", "#37474f", "#78909c", "#4e342e", "#6d4c41",
   "#8e24aa", "#ab47bc", "#1e88e5", "#42a5f5", "#2e7d32",
@@ -1057,19 +1160,16 @@ export function FurniturePropertiesPanel() {
 
   const selFurn = furniture.find((f) => f.id === selectedId);
 
-  // Local editable strings for size — so user can clear and retype freely
-  const [wStr, setWStr] = React.useState("");
-  const [hStr, setHStr] = React.useState("");
+  const [wStr, setWStr] = useState("");
+  const [hStr, setHStr] = useState("");
 
-  // Sync local strings when a new item is selected
-  React.useEffect(() => {
+  useEffect(() => {
     if (selFurn) {
       setWStr(String(selFurn.width ?? ""));
       setHStr(String(selFurn.height ?? ""));
     }
-  }, [selFurn?.id]); // only reset when the selected item changes
+  }, [selFurn?.id]);
 
-  // Only show in 2D mode when a furniture item is selected
   if (viewMode !== "2d" || !selFurn) return null;
 
   const rot = selFurn.rotation ?? 0;
@@ -1081,13 +1181,13 @@ export function FurniturePropertiesPanel() {
   const commitWidth = () => {
     const v = parseFloat(wStr);
     if (!isNaN(v) && v > 0) update({ width: v });
-    else setWStr(String(selFurn.width)); // revert if invalid
+    else setWStr(String(selFurn.width));
   };
 
   const commitHeight = () => {
     const v = parseFloat(hStr);
     if (!isNaN(v) && v > 0) update({ height: v });
-    else setHStr(String(selFurn.height)); // revert if invalid
+    else setHStr(String(selFurn.height));
   };
 
   const handleDuplicate = () => {
@@ -1099,7 +1199,6 @@ export function FurniturePropertiesPanel() {
     });
   };
 
-  // Icon based on type prefix
   const typeIcon = selFurn.type?.startsWith("door")
     ? "🚪"
     : selFurn.type?.startsWith("window")
@@ -1131,7 +1230,6 @@ export function FurniturePropertiesPanel() {
         overflowX: "hidden",
       }}
     >
-      {/* ── Header ── */}
       <div
         style={{
           padding: "14px 14px 10px",
@@ -1194,10 +1292,7 @@ export function FurniturePropertiesPanel() {
         </button>
       </div>
 
-      {/* ── Body ── */}
       <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 14 }}>
-
-        {/* Label */}
         <div>
           <div className="prop-label" style={{ marginBottom: 4 }}>Label / Name</div>
           <input
@@ -1208,7 +1303,6 @@ export function FurniturePropertiesPanel() {
           />
         </div>
 
-        {/* Size */}
         <div>
           <div className="prop-label" style={{ marginBottom: 6 }}>📐 Size (cm)</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -1239,7 +1333,6 @@ export function FurniturePropertiesPanel() {
           </div>
         </div>
 
-        {/* Rotation */}
         <div>
           <div className="prop-label" style={{ marginBottom: 6 }}>🔄 Rotation</div>
           <input
@@ -1281,7 +1374,6 @@ export function FurniturePropertiesPanel() {
           </div>
         </div>
 
-        {/* Color */}
         <div>
           <div className="prop-label" style={{ marginBottom: 6 }}>🎨 Color</div>
           <div
@@ -1336,7 +1428,6 @@ export function FurniturePropertiesPanel() {
           </div>
         </div>
 
-        {/* Opacity */}
         <div>
           <div
             style={{
@@ -1362,7 +1453,6 @@ export function FurniturePropertiesPanel() {
           />
         </div>
 
-        {/* Flip */}
         <div>
           <div className="prop-label" style={{ marginBottom: 6 }}>↔ Transform</div>
           <button
@@ -1384,7 +1474,6 @@ export function FurniturePropertiesPanel() {
           </button>
         </div>
 
-        {/* Position (read-only info) */}
         <div
           style={{
             padding: "8px 10px",
@@ -1402,10 +1491,8 @@ export function FurniturePropertiesPanel() {
           <span>Type: <strong style={{ color: "var(--text-secondary)", textTransform: "capitalize" }}>{(selFurn.type ?? "").replace(/_/g, " ")}</strong></span>
         </div>
 
-        {/* Divider */}
         <div style={{ height: 1, background: "var(--border)" }} />
 
-        {/* Actions */}
         <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
           <button
             onClick={handleDuplicate}
@@ -1462,6 +1549,79 @@ export function FurniturePropertiesPanel() {
   );
 }
 
+// ─── Main Right Panel Sidebar Export ─────────────────────────────────────────
 export default function RightPanel() {
-  return null;
+  const { showAIPanel, showLibrary } = useDesignStore();
+  const [activeTab, setActiveTab] = useState("floors");
+
+  // Sync header button toggles with active tab
+  useEffect(() => {
+    if (showAIPanel) setActiveTab("ai");
+  }, [showAIPanel]);
+
+  useEffect(() => {
+    if (showLibrary) setActiveTab("library");
+  }, [showLibrary]);
+
+  return (
+    <aside
+      className="right-panel"
+      style={{
+        width: 320,
+        flexShrink: 0,
+        display: "flex",
+        flexDirection: "column",
+        background: "var(--bg-secondary)",
+        borderLeft: "1px solid var(--border)",
+        height: "100%",
+        zIndex: 50,
+      }}
+    >
+      {/* Panel Navigation Tabs */}
+      <div
+        style={{
+          display: "flex",
+          borderBottom: "1px solid var(--border)",
+          background: "var(--bg-secondary)",
+          flexShrink: 0,
+        }}
+      >
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                flex: 1,
+                padding: "11px 4px",
+                fontSize: 11,
+                fontWeight: isActive ? 700 : 500,
+                border: "none",
+                background: isActive ? "var(--bg-tertiary)" : "transparent",
+                color: isActive ? "var(--accent)" : "var(--text-muted)",
+                cursor: "pointer",
+                borderBottom: isActive
+                  ? "2px solid var(--accent)"
+                  : "2px solid transparent",
+                transition: "all 0.15s",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab Body */}
+      <div className="panel-body" style={{ flex: 1, overflowY: "auto", padding: 14 }}>
+        {activeTab === "floors" && <FloorsPanel />}
+        {activeTab === "rooms" && <RoomsPanel />}
+        {activeTab === "library" && <LibraryPanel />}
+        {activeTab === "ai" && <AIPanel />}
+        {activeTab === "theme" && <ThemePanel />}
+      </div>
+    </aside>
+  );
 }

@@ -8,7 +8,6 @@ import RightPanel, { FurniturePropertiesPanel } from './components/RightPanel';
 
 const ThreeDViewer      = React.lazy(() => import('./components/ThreeDViewer'));
 const WalkthroughViewer = React.lazy(() => import('./components/WalkthroughViewer'));
-const VRViewer          = React.lazy(() => import('./components/VRViewer'));
 
 function ViewerLoading() {
   return (
@@ -67,14 +66,6 @@ export default function App() {
             <div style={{ position: 'absolute', inset: 0 }}>
               <Suspense fallback={<ViewerLoading />}>
                 <WalkthroughViewer />
-              </Suspense>
-            </div>
-          )}
-
-          {viewMode === 'vr' && (
-            <div style={{ position: 'absolute', inset: 0 }}>
-              <Suspense fallback={<ViewerLoading />}>
-                <VRViewer />
               </Suspense>
             </div>
           )}
