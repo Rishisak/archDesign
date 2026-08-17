@@ -5,29 +5,16 @@ const VIEWS = [
   { id: '2d',          label: '2D Plan',    icon: '⊞' },
   { id: '3d',          label: '3D View',    icon: '◈' },
   { id: 'walkthrough', label: 'Walkthrough', icon: '▶' },
-  { id: 'vr',          label: 'VR',         icon: '◉' },
 ];
 
 export default function Header() {
-  const { viewMode, setViewMode, activeFloor, setActiveFloor, floors,
-          showAIPanel, setShowAIPanel, showLibrary, setShowLibrary,
-          snapToGrid, setSnapToGrid, clearDesign, loadDemo,
-          exportProjectJSON, importProjectJSON } = useDesignStore();
-
-  const fileInputRef = React.useRef(null);
-
-  const handleFileUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      if (evt.target?.result) {
-        importProjectJSON(evt.target.result);
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  };
+  const {
+    viewMode, setViewMode,
+    showAIPanel, setShowAIPanel,
+    snapToGrid, setSnapToGrid,
+    clearDesign, loadDemo,
+    exportProjectJSON
+  } = useDesignStore();
 
   return (
     <header style={{
@@ -40,6 +27,7 @@ export default function Header() {
       flexShrink: 0,
       zIndex: 100,
       gap: 0,
+      overflow: 'hidden',
     }}>
       {/* Logo */}
       <div className="header-logo">
@@ -65,53 +53,17 @@ export default function Header() {
         ))}
       </div>
 
-      <div className="header-divider" />
-
-      {/* Floor Selector */}
-      <div className="floor-selector" style={{ marginLeft: 0 }}>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>FLOOR</span>
-        {floors.map(f => (
-          <button
-            key={f.id}
-            className={`floor-btn ${activeFloor === f.id ? 'active' : ''}`}
-            onClick={() => setActiveFloor(f.id)}
-          >
-            {f.name}
-          </button>
-        ))}
-      </div>
-
       {/* Spacer */}
       <div style={{ flex: 1 }} />
 
       {/* Actions */}
       <div className="header-actions">
-        {/* Hidden File Input */}
-        <input
-          type="file"
-          ref={fileInputRef}
-          accept=".json"
-          style={{ display: 'none' }}
-          onChange={handleFileUpload}
-        />
-
-        {/* Open Project File */}
-        <button
-          className="btn btn-secondary"
-          onClick={() => fileInputRef.current?.click()}
-          title="Open Saved Project File (.json)"
-          style={{ gap: 6, fontSize: 12, padding: '4px 10px' }}
-        >
-          <span>📂</span>
-          <span>Open File</span>
-        </button>
-
-        {/* Save Project File */}
+        {/* Save File */}
         <button
           className="btn btn-primary"
           onClick={exportProjectJSON}
           title="Save Design File (.json)"
-          style={{ gap: 6, fontSize: 12, padding: '4px 10px' }}
+          style={{ gap: 6, fontSize: 12, padding: '5px 12px' }}
         >
           <span>💾</span>
           <span>Save File</span>
@@ -146,23 +98,10 @@ export default function Header() {
           </svg>
         </button>
 
-        {/* Library */}
-        <button
-          className={`icon-btn ${showLibrary ? 'active' : ''}`}
-          onClick={() => setShowLibrary(!showLibrary)}
-          title="Asset Library"
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M2 3h12v2H2z"/>
-            <path d="M2 7h12v2H2z"/>
-            <path d="M2 11h12v2H2z"/>
-          </svg>
-        </button>
-
         <div className="header-divider" style={{ margin: '0 4px' }} />
 
-        {/* Reset */}
-        <button className="icon-btn" onClick={loadDemo} title="Load Demo">
+        {/* Reset / Demo */}
+        <button className="icon-btn" onClick={loadDemo} title="Load Demo Project">
           <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5">
             <path d="M2 8a6 6 0 0 1 10-4.5L14 6"/>
             <path d="M14 2v4h-4"/>

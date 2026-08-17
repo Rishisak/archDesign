@@ -737,3 +737,13 @@ html, body, #root {
   .right-panel { position: absolute; right: 0; top: 0; bottom: 0; z-index: 90; transform: translateX(100%); transition: transform 0.3s; }
   .right-panel.open { transform: none; }
 }
+
+/* ── Furniture Properties Panel animations ───────────────── */
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(28px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+:root {
+  --bg-hover: #2a3040;
+}
