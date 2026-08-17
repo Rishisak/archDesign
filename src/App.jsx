@@ -1,4 +1,4 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import './index.css';
 import { useDesignStore } from './store/designStore';
 import Header from './components/Header';
@@ -30,6 +30,44 @@ function ViewerLoading() {
 export default function App() {
   const { viewMode } = useDesignStore();
   const is2D = viewMode === '2d';
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+         activeEl.tagName === 'TEXTAREA' ||
+         activeEl.isContentEditable)
+      ) {
+        return;
+      }
+
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+      if (cmdOrCtrl) {
+        if (e.key.toLowerCase() === 'z') {
+          if (e.shiftKey) {
+            e.preventDefault();
+            const { redo, canRedo } = useDesignStore.getState();
+            if (canRedo) redo();
+          } else {
+            e.preventDefault();
+            const { undo, canUndo } = useDesignStore.getState();
+            if (canUndo) undo();
+          }
+        } else if (e.key.toLowerCase() === 'y') {
+          e.preventDefault();
+          const { redo, canRedo } = useDesignStore.getState();
+          if (canRedo) redo();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>

@@ -286,8 +286,67 @@ const AI_SUGGESTIONS = [
   },
 ];
 
+function deepClone(obj) {
+  if (obj instanceof Set) {
+    return new Set(obj);
+  }
+  if (typeof structuredClone === "function") {
+    try {
+      return structuredClone(obj);
+    } catch {
+      // fallback
+    }
+  }
+  if (obj === null || typeof obj !== "object") return obj;
+  return JSON.parse(JSON.stringify(obj));
+}
+
+function getDesignSnapshot(state) {
+  return {
+    grounds: deepClone(state.grounds),
+    rooms: deepClone(state.rooms),
+    doors: deepClone(state.doors),
+    windows: deepClone(state.windows),
+    furniture: deepClone(state.furniture),
+    floors: deepClone(state.floors),
+    pbrMaterialTheme: deepClone(state.pbrMaterialTheme),
+    theme: state.theme,
+    windowModes: deepClone(state.windowModes),
+    entrances: deepClone(state.entrances || []),
+    openDoors: new Set(state.openDoors || []),
+    openWindows: new Set(state.openWindows || []),
+    aiSuggestions: deepClone(state.aiSuggestions || []),
+  };
+}
+
+let lastHistoryTime = 0;
+const MAX_HISTORY = 50;
+
+function saveHistory(get, set, force = false) {
+  const state = get();
+  const now = Date.now();
+  const currentSnap = getDesignSnapshot(state);
+
+  if (force || now - lastHistoryTime > 400) {
+    const past = [...state.past, currentSnap].slice(-MAX_HISTORY);
+    set({
+      past,
+      future: [],
+      canUndo: past.length > 0,
+      canRedo: false,
+    });
+    lastHistoryTime = now;
+  }
+}
+
 export const useDesignStore = create(
   subscribeWithSelector((set, get) => ({
+    // History state
+    past: [],
+    future: [],
+    canUndo: false,
+    canRedo: false,
+
     // Core state
     grounds: DEFAULT_GROUNDS,
     rooms: DEFAULT_ROOMS,
@@ -345,6 +404,69 @@ export const useDesignStore = create(
     draggingFurniture: null,
     resizingRoom: null,
 
+    // ─── Undo / Redo Actions ───────────────────────────────────────────────────────
+    undo: () => {
+      const state = get();
+      if (state.past.length === 0) return;
+
+      const previousSnap = state.past[state.past.length - 1];
+      const newPast = state.past.slice(0, state.past.length - 1);
+      const currentSnap = getDesignSnapshot(state);
+      const newFuture = [currentSnap, ...state.future];
+
+      let selectedId = state.selectedId;
+      if (selectedId) {
+        const exists =
+          previousSnap.rooms.some((r) => r.id === selectedId) ||
+          previousSnap.furniture.some((f) => f.id === selectedId) ||
+          previousSnap.doors.some((d) => d.id === selectedId) ||
+          previousSnap.windows.some((w) => w.id === selectedId) ||
+          previousSnap.grounds.some((g) => g.id === selectedId);
+        if (!exists) selectedId = null;
+      }
+
+      set({
+        ...previousSnap,
+        selectedId,
+        past: newPast,
+        future: newFuture,
+        canUndo: newPast.length > 0,
+        canRedo: true,
+      });
+      lastHistoryTime = 0;
+    },
+
+    redo: () => {
+      const state = get();
+      if (state.future.length === 0) return;
+
+      const nextSnap = state.future[0];
+      const newFuture = state.future.slice(1);
+      const currentSnap = getDesignSnapshot(state);
+      const newPast = [...state.past, currentSnap];
+
+      let selectedId = state.selectedId;
+      if (selectedId) {
+        const exists =
+          nextSnap.rooms.some((r) => r.id === selectedId) ||
+          nextSnap.furniture.some((f) => f.id === selectedId) ||
+          nextSnap.doors.some((d) => d.id === selectedId) ||
+          nextSnap.windows.some((w) => w.id === selectedId) ||
+          nextSnap.grounds.some((g) => g.id === selectedId);
+        if (!exists) selectedId = null;
+      }
+
+      set({
+        ...nextSnap,
+        selectedId,
+        past: newPast,
+        future: newFuture,
+        canUndo: true,
+        canRedo: newFuture.length > 0,
+      });
+      lastHistoryTime = 0;
+    },
+
     // ─── Actions ──────────────────────────────────────────────────────────────────
     setViewMode: (mode) =>
       set((s) => {
@@ -360,7 +482,8 @@ export const useDesignStore = create(
     setActiveFloor: (floor) => set({ activeFloor: floor }),
 
     // ── Floor management ──────────────────────────────────────────────────
-    addFloor: () =>
+    addFloor: () => {
+      saveHistory(get, set, true);
       set((s) => {
         const newId = Date.now();
         const orderedFloors = [...s.floors].sort((a, b) => a.id - b.id);
@@ -378,9 +501,6 @@ export const useDesignStore = create(
         let autoGrounds = [];
 
         if (baseRooms.length > 0) {
-          // ── Derive ground from the bounding box of all ground-floor rooms ──
-          // Add a small margin (10 px) so rooms on the upper floor can align
-          // exactly to the same edges without the point-in-polygon check failing.
           const MARGIN = 10;
           const minX = Math.min(...baseRooms.map((r) => r.x)) - MARGIN;
           const minY = Math.min(...baseRooms.map((r) => r.y)) - MARGIN;
@@ -399,7 +519,6 @@ export const useDesignStore = create(
             ],
           }];
         } else {
-          // Fallback: copy explicit ground polygons if no rooms exist
           autoGrounds = s.grounds
             .filter((g) => g.floor === baseFloorId)
             .map((g) => ({
@@ -414,12 +533,13 @@ export const useDesignStore = create(
           floors: [...s.floors, newFloor],
           grounds: [...s.grounds, ...autoGrounds],
           activeFloor: newId,
-          // Pre-approve so rooms can be drawn immediately – no 3D preview required
           groundPreviewed3D: { ...s.groundPreviewed3D, [newId]: true },
         };
-      }),
+      });
+    },
 
-    deleteFloor: (id) =>
+    deleteFloor: (id) => {
+      saveHistory(get, set, true);
       set((s) => {
         if (s.floors.length <= 1) return {}; // must keep at least 1 floor
         const remaining = s.floors.filter((f) => f.id !== id);
@@ -443,31 +563,41 @@ export const useDesignStore = create(
           grounds: s.grounds.filter((g) => g.floor !== id),
           selectedId: null,
         };
-      }),
+      });
+    },
 
-    renameFloor: (id, name) =>
+    renameFloor: (id, name) => {
+      saveHistory(get, set, true);
       set((s) => ({
         floors: s.floors.map((f) => (f.id === id ? { ...f, name } : f)),
-      })),
+      }));
+    },
 
     setSelectedId: (id) => set({ selectedId: id }),
     setShowAIPanel: (v) => set({ showAIPanel: v }),
     setShowLibrary: (v) => set({ showLibrary: v }),
     setZoom: (zoom) => set({ zoom: Math.min(3, Math.max(0.2, zoom)) }),
     setPan: (panX, panY) => set({ panX, panY }),
-    setTheme: (theme) => set({ theme }),
+    setTheme: (theme) => {
+      saveHistory(get, set, true);
+      set({ theme });
+    },
     setCanvas2DTheme: (canvas2DTheme) => set({ canvas2DTheme }),
     toggleCanvas2DTheme: () =>
       set((s) => ({ canvas2DTheme: s.canvas2DTheme === "light" ? "dark" : "light" })),
-    setPBRMaterialTheme: (patch) =>
-      set((s) => ({ pbrMaterialTheme: { ...s.pbrMaterialTheme, ...patch } })),
+    setPBRMaterialTheme: (patch) => {
+      saveHistory(get, set, true);
+      set((s) => ({ pbrMaterialTheme: { ...s.pbrMaterialTheme, ...patch } }));
+    },
     setSnapToGrid: (v) => set({ snapToGrid: v }),
-    toggleWindowMode: (id) =>
+    toggleWindowMode: (id) => {
+      saveHistory(get, set, true);
       set((s) => {
         const current = s.windowModes[id] || "sliding";
         const nextMode = current === "sliding" ? "casement" : "sliding";
         return { windowModes: { ...s.windowModes, [id]: nextMode } };
-      }),
+      });
+    },
 
     snap: (val) => {
       const { snapToGrid, gridSize } = get();
@@ -475,28 +605,35 @@ export const useDesignStore = create(
     },
 
     // Room CRUD
-    addRoom: (room) =>
+    addRoom: (room) => {
+      saveHistory(get, set, true);
       set((s) => ({
         rooms: [
           ...s.rooms,
           { id: genId("room"), floor: s.activeFloor, ...room },
         ],
-      })),
-    updateRoom: (id, patch) =>
+      }));
+    },
+    updateRoom: (id, patch) => {
+      saveHistory(get, set, false);
       set((s) => ({
         rooms: s.rooms.map((r) => (r.id === id ? { ...r, ...patch } : r)),
-      })),
-    deleteRoom: (id) =>
+      }));
+    },
+    deleteRoom: (id) => {
+      saveHistory(get, set, true);
       set((s) => ({
         rooms: s.rooms.filter((r) => r.id !== id),
         doors: s.doors.filter((d) => d.roomId !== id),
         windows: s.windows.filter((w) => w.roomId !== id),
         furniture: s.furniture.filter((f) => f.roomId !== id),
         selectedId: s.selectedId === id ? null : s.selectedId,
-      })),
+      }));
+    },
 
     // Ground footprint CRUD
-    addGroundPolygon: (points) =>
+    addGroundPolygon: (points) => {
+      saveHistory(get, set, true);
       set((s) => ({
         grounds: [
           ...s.grounds,
@@ -508,20 +645,26 @@ export const useDesignStore = create(
           }),
         ],
         groundPreviewed3D: { ...s.groundPreviewed3D, [s.activeFloor]: false },
-      })),
-    updateGroundPolygon: (id, points) =>
+      }));
+    },
+    updateGroundPolygon: (id, points) => {
+      saveHistory(get, set, false);
       set((s) => ({
         grounds: s.grounds.map((g) =>
           g.id === id ? normalizeGround({ ...g, points }) : g,
         ),
         groundPreviewed3D: { ...s.groundPreviewed3D, [s.activeFloor]: false },
-      })),
-    deleteGround: (id) =>
+      }));
+    },
+    deleteGround: (id) => {
+      saveHistory(get, set, true);
       set((s) => ({
         grounds: s.grounds.filter((g) => g.id !== id),
         selectedId: s.selectedId === id ? null : s.selectedId,
-      })),
-    mergeGrounds: (groundIds) =>
+      }));
+    },
+    mergeGrounds: (groundIds) => {
+      saveHistory(get, set, true);
       set((s) => {
         const selected = s.grounds.filter(
           (g) => groundIds.includes(g.id) && g.floor === s.activeFloor,
@@ -543,10 +686,12 @@ export const useDesignStore = create(
           selectedId: mergedId,
           groundPreviewed3D: { ...s.groundPreviewed3D, [s.activeFloor]: false },
         };
-      }),
+      });
+    },
 
     // Room Extending & Merging
-    extendRoom: (id, dir, delta = 40) =>
+    extendRoom: (id, dir, delta = 40) => {
+      saveHistory(get, set, false);
       set((s) => ({
         rooms: s.rooms.map((r) => {
           if (r.id !== id) return r;
@@ -568,9 +713,11 @@ export const useDesignStore = create(
             return { ...r, width: Math.max(40, r.width + delta) };
           return r;
         }),
-      })),
+      }));
+    },
 
-    mergeRooms: (id1, id2) =>
+    mergeRooms: (id1, id2) => {
+      saveHistory(get, set, true);
       set((s) => {
         const r1 = s.rooms.find((r) => r.id === id1);
         const r2 = s.rooms.find((r) => r.id === id2);
@@ -605,7 +752,8 @@ export const useDesignStore = create(
           ),
           selectedId: id1,
         };
-      }),
+      });
+    },
 
     // File Import / Export
     exportProjectJSON: () => {
@@ -653,6 +801,7 @@ export const useDesignStore = create(
           typeof jsonData === "string" ? JSON.parse(jsonData) : jsonData;
         if (!data.rooms || !Array.isArray(data.rooms))
           throw new Error("Invalid project file format.");
+        saveHistory(get, set, true);
         set({
           grounds: (data.grounds || []).map(normalizeGround),
           rooms: data.rooms || [],
@@ -680,62 +829,85 @@ export const useDesignStore = create(
     },
 
     // Door / Window
-    addDoor: (door) =>
-      set((s) => ({ doors: [...s.doors, { id: genId("door"), ...door }] })),
-    addWindow: (win) =>
-      set((s) => ({ windows: [...s.windows, { id: genId("win"), ...win }] })),
-    updateDoor: (id, patch) =>
+    addDoor: (door) => {
+      saveHistory(get, set, true);
+      set((s) => ({ doors: [...s.doors, { id: genId("door"), ...door }] }));
+    },
+    addWindow: (win) => {
+      saveHistory(get, set, true);
+      set((s) => ({ windows: [...s.windows, { id: genId("win"), ...win }] }));
+    },
+    updateDoor: (id, patch) => {
+      saveHistory(get, set, false);
       set((s) => ({
         doors: s.doors.map((d) => (d.id === id ? { ...d, ...patch } : d)),
-      })),
-    updateWindow: (id, patch) =>
+      }));
+    },
+    updateWindow: (id, patch) => {
+      saveHistory(get, set, false);
       set((s) => ({
         windows: s.windows.map((w) => (w.id === id ? { ...w, ...patch } : w)),
-      })),
-    deleteDoor: (id) =>
+      }));
+    },
+    deleteDoor: (id) => {
+      saveHistory(get, set, true);
       set((s) => ({
         doors: s.doors.filter((d) => d.id !== id),
         selectedId: s.selectedId === id ? null : s.selectedId,
-      })),
-    deleteWindow: (id) =>
+      }));
+    },
+    deleteWindow: (id) => {
+      saveHistory(get, set, true);
       set((s) => ({
         windows: s.windows.filter((w) => w.id !== id),
         selectedId: s.selectedId === id ? null : s.selectedId,
-      })),
-    toggleDoor: (id) =>
+      }));
+    },
+    toggleDoor: (id) => {
+      saveHistory(get, set, true);
       set((s) => {
         const next = new Set(s.openDoors);
         if (next.has(id)) next.delete(id);
         else next.add(id);
         return { openDoors: next };
-      }),
-    toggleWindow: (id) =>
+      });
+    },
+    toggleWindow: (id) => {
+      saveHistory(get, set, true);
       set((s) => {
         const next = new Set(s.openWindows);
         if (next.has(id)) next.delete(id);
         else next.add(id);
         return { openWindows: next };
-      }),
+      });
+    },
 
     // Furniture
-    addFurniture: (item) =>
+    addFurniture: (item) => {
+      saveHistory(get, set, true);
       set((s) => ({
         furniture: [
           ...s.furniture,
           { id: genId("furn"), floor: s.activeFloor, ...item },
         ],
-      })),
-    updateFurniture: (id, patch) =>
+      }));
+    },
+    updateFurniture: (id, patch) => {
+      saveHistory(get, set, false);
       set((s) => ({
         furniture: s.furniture.map((f) =>
           f.id === id ? { ...f, ...patch } : f,
         ),
-      })),
-    deleteFurniture: (id) =>
-      set((s) => ({ furniture: s.furniture.filter((f) => f.id !== id) })),
+      }));
+    },
+    deleteFurniture: (id) => {
+      saveHistory(get, set, true);
+      set((s) => ({ furniture: s.furniture.filter((f) => f.id !== id) }));
+    },
 
     // AI
-    applySuggestion: (id) =>
+    applySuggestion: (id) => {
+      saveHistory(get, set, true);
       set((s) => {
         const sugg = s.aiSuggestions.find((a) => a.id === id);
         let windows = s.windows;
@@ -757,11 +929,14 @@ export const useDesignStore = create(
           ),
           windows,
         };
-      }),
-    dismissSuggestion: (id) =>
+      });
+    },
+    dismissSuggestion: (id) => {
+      saveHistory(get, set, true);
       set((s) => ({
         aiSuggestions: s.aiSuggestions.filter((a) => a.id !== id),
-      })),
+      }));
+    },
 
     // Drawing
     startDrawing: (point) =>
@@ -796,13 +971,11 @@ export const useDesignStore = create(
 
         if (floorGrounds.length === 0) {
           if (isUpperFloor) {
-            // Upper floor with no ground yet — just place the room (rare edge case)
             addRoom({ x, y, width, height, name: "New Room", color: "#f0f4ff", type: "room" });
           } else {
             alert("Draw a ground footprint first.");
           }
         } else if (!isUpperFloor && !groundPreviewed3D[activeFloor]) {
-          // Only enforce the 3D-preview gate on the ground floor itself
           alert("Preview your ground in 3D View before creating rooms.");
         } else {
           const inside = rectInsideAnyGround(x, y, width, height, floorGrounds);
@@ -824,7 +997,8 @@ export const useDesignStore = create(
       set({ isDrawingRoom: false, drawStart: null, drawCurrent: null }),
 
     // Reset
-    clearDesign: () =>
+    clearDesign: () => {
+      saveHistory(get, set, true);
       set({
         grounds: [],
         rooms: [],
@@ -833,8 +1007,10 @@ export const useDesignStore = create(
         furniture: [],
         selectedId: null,
         groundPreviewed3D: {},
-      }),
-    loadDemo: () =>
+      });
+    },
+    loadDemo: () => {
+      saveHistory(get, set, true);
       set({
         grounds: DEFAULT_GROUNDS,
         rooms: DEFAULT_ROOMS,
@@ -843,6 +1019,7 @@ export const useDesignStore = create(
         furniture: DEFAULT_FURNITURE,
         aiSuggestions: AI_SUGGESTIONS,
         groundPreviewed3D: {},
-      }),
+      });
+    },
   })),
 );

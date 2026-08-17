@@ -13,7 +13,8 @@ export default function Header() {
     showAIPanel, setShowAIPanel,
     snapToGrid, setSnapToGrid,
     clearDesign, loadDemo,
-    exportProjectJSON
+    exportProjectJSON,
+    undo, redo, canUndo, canRedo
   } = useDesignStore();
 
   return (
@@ -58,6 +59,36 @@ export default function Header() {
 
       {/* Actions */}
       <div className="header-actions">
+        {/* Undo */}
+        <button
+          className="icon-btn"
+          onClick={undo}
+          disabled={!canUndo}
+          title="Undo (Ctrl+Z)"
+          aria-label="Undo"
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 7h6.5a3.5 3.5 0 0 1 0 7H8" />
+            <path d="M6.5 4.5L4 7l2.5 2.5" />
+          </svg>
+        </button>
+
+        {/* Redo */}
+        <button
+          className="icon-btn"
+          onClick={redo}
+          disabled={!canRedo}
+          title="Redo (Ctrl+Y)"
+          aria-label="Redo"
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 7H5.5a3.5 3.5 0 0 0 0 7H8" />
+            <path d="M9.5 4.5L12 7l-2.5 2.5" />
+          </svg>
+        </button>
+
+        <div className="header-divider" style={{ margin: '0 4px' }} />
+
         {/* Save File */}
         <button
           className="btn btn-primary"

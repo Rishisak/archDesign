@@ -243,6 +243,14 @@ html, body, #root {
 }
 .icon-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
 .icon-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+.icon-btn:disabled, .icon-btn[disabled] {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+  background: var(--bg-tertiary);
+  border-color: var(--border);
+  color: var(--text-muted);
+}
 
 /* ── Toolbar ─────────────────────────────────────────────── */
 .toolbar {
