@@ -5,6 +5,7 @@ import Header from './components/Header';
 import Toolbar from './components/Toolbar';
 import Canvas2D from './components/Canvas2D';
 import RightPanel, { FurniturePropertiesPanel } from './components/RightPanel';
+import BottomPanel from './components/BottomPanel';
 
 const ThreeDViewer      = React.lazy(() => import('./components/ThreeDViewer'));
 const WalkthroughViewer = React.lazy(() => import('./components/WalkthroughViewer'));
@@ -79,34 +80,40 @@ export default function App() {
         {/* Left toolbar — only in 2D */}
         {is2D && <Toolbar />}
 
-        {/* Canvas / viewer area */}
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          {/* 2D canvas — always mounted, shown only in 2D mode */}
-          <div style={{
-            position: 'absolute', inset: 0,
-            visibility: is2D ? 'visible' : 'hidden',
-            pointerEvents: is2D ? 'auto' : 'none',
-          }}>
-            <Canvas2D />
-            {/* Furniture Properties side panel — overlays from right */}
-            <FurniturePropertiesPanel />
+        {/* Canvas / viewer area + bottom panel */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+          {/* Canvas viewer */}
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+            {/* 2D canvas — always mounted, shown only in 2D mode */}
+            <div style={{
+              position: 'absolute', inset: 0,
+              visibility: is2D ? 'visible' : 'hidden',
+              pointerEvents: is2D ? 'auto' : 'none',
+            }}>
+              <Canvas2D />
+              {/* Furniture Properties side panel — overlays from right */}
+              <FurniturePropertiesPanel />
+            </div>
+
+            {viewMode === '3d' && (
+              <div style={{ position: 'absolute', inset: 0 }}>
+                <Suspense fallback={<ViewerLoading />}>
+                  <ThreeDViewer />
+                </Suspense>
+              </div>
+            )}
+
+            {viewMode === 'walkthrough' && (
+              <div style={{ position: 'absolute', inset: 0 }}>
+                <Suspense fallback={<ViewerLoading />}>
+                  <WalkthroughViewer />
+                </Suspense>
+              </div>
+            )}
           </div>
 
-          {viewMode === '3d' && (
-            <div style={{ position: 'absolute', inset: 0 }}>
-              <Suspense fallback={<ViewerLoading />}>
-                <ThreeDViewer />
-              </Suspense>
-            </div>
-          )}
-
-          {viewMode === 'walkthrough' && (
-            <div style={{ position: 'absolute', inset: 0 }}>
-              <Suspense fallback={<ViewerLoading />}>
-                <WalkthroughViewer />
-              </Suspense>
-            </div>
-          )}
+          {/* Bottom panel: AI bot + Floor manager */}
+          <BottomPanel />
         </div>
 
         {/* Right panel */}
