@@ -511,8 +511,12 @@ function DoorMesh({ door, pos, size, isOpen, onToggle }) {
   const frameEmissive = hovered ? "#4a3010" : "#000000";
   const leafColor = isOpen ? "#e8c890" : hovered ? "#9a7c54" : "#7a5c3a";
   const leafEmissive = isOpen
-    ? hovered ? "#604020" : "#3a2010"
-    : hovered ? "#2a1a08" : "#000000";
+    ? hovered
+      ? "#604020"
+      : "#3a2010"
+    : hovered
+      ? "#2a1a08"
+      : "#000000";
   const knobEmissive = hovered ? "#6a5010" : isOpen ? "#4a3808" : "#000000";
 
   return (
@@ -1040,7 +1044,12 @@ function buildWallSegments(cx, cz, rw, rd, side, doors, windows) {
 
   // Map door-wall names → which axis the opening lives on
   // "top"/"bottom" walls run along X; "left"/"right" walls run along Z
-  const wallMap = { north: "top", south: "bottom", west: "left", east: "right" };
+  const wallMap = {
+    north: "top",
+    south: "bottom",
+    west: "left",
+    east: "right",
+  };
   const wallKey = wallMap[side];
 
   // Collect all openings on this wall (doors + windows)
@@ -1055,12 +1064,12 @@ function buildWallSegments(cx, cz, rw, rd, side, doors, windows) {
 
   wallDoors.forEach((d) => {
     const dw = d.width * SC;
-    const center = d.position * wallLen;          // position is 0–1 fraction
+    const center = d.position * wallLen; // position is 0–1 fraction
     openings.push({
       start: center - dw / 2,
       end: center + dw / 2,
       floorY: 0,
-      ceilY: 2.2,                                 // full-height door opening
+      ceilY: 2.2, // full-height door opening
     });
   });
 
@@ -1070,8 +1079,8 @@ function buildWallSegments(cx, cz, rw, rd, side, doors, windows) {
     openings.push({
       start: center - ww / 2,
       end: center + ww / 2,
-      floorY: 1.1,                                // sill height
-      ceilY: 1.1 + 1.1,                           // sill + 1.1 m height
+      floorY: 1.1, // sill height
+      ceilY: 1.1 + 1.1, // sill + 1.1 m height
     });
   });
 
@@ -1102,17 +1111,29 @@ function buildWallSegments(cx, cz, rw, rd, side, doors, windows) {
     const midY = (yBot + yTop) / 2;
 
     if (side === "north") {
-      const wx = (cx - wallLen / 2) + midLocal;
-      segs.push({ pos: [wx, midY, cz - rd / 2 + t / 2], size: [segLen, segHeight, t] });
+      const wx = cx - wallLen / 2 + midLocal;
+      segs.push({
+        pos: [wx, midY, cz - rd / 2 + t / 2],
+        size: [segLen, segHeight, t],
+      });
     } else if (side === "south") {
-      const wx = (cx - wallLen / 2) + midLocal;
-      segs.push({ pos: [wx, midY, cz + rd / 2 - t / 2], size: [segLen, segHeight, t] });
+      const wx = cx - wallLen / 2 + midLocal;
+      segs.push({
+        pos: [wx, midY, cz + rd / 2 - t / 2],
+        size: [segLen, segHeight, t],
+      });
     } else if (side === "west") {
-      const wz = (cz - wallLen / 2) + midLocal;
-      segs.push({ pos: [cx - rw / 2 + t / 2, midY, wz], size: [t, segHeight, segLen] });
+      const wz = cz - wallLen / 2 + midLocal;
+      segs.push({
+        pos: [cx - rw / 2 + t / 2, midY, wz],
+        size: [t, segHeight, segLen],
+      });
     } else if (side === "east") {
-      const wz = (cz - wallLen / 2) + midLocal;
-      segs.push({ pos: [cx + rw / 2 - t / 2, midY, wz], size: [t, segHeight, segLen] });
+      const wz = cz - wallLen / 2 + midLocal;
+      segs.push({
+        pos: [cx + rw / 2 - t / 2, midY, wz],
+        size: [t, segHeight, segLen],
+      });
     }
   };
 
@@ -1233,9 +1254,7 @@ function Scene({ showRoof, timeOfDay, showAllFloors }) {
   } = useDesignStore();
 
   // Which floor IDs to render
-  const visFloorIds = showAllFloors
-    ? floors.map((f) => f.id)
-    : [activeFloor];
+  const visFloorIds = showAllFloors ? floors.map((f) => f.id) : [activeFloor];
 
   // Ground footprints for visible floors
   const allVisGrounds = useMemo(
@@ -1333,11 +1352,7 @@ function Scene({ showRoof, timeOfDay, showAllFloors }) {
                 return (
                   <mesh
                     key={`slab-${g.id}`}
-                    position={[
-                      (minX + maxX) / 2,
-                      -0.08,
-                      (minZ + maxZ) / 2,
-                    ]}
+                    position={[(minX + maxX) / 2, -0.08, (minZ + maxZ) / 2]}
                     receiveShadow
                   >
                     <boxGeometry args={[maxX - minX, 0.16, maxZ - minZ]} />
@@ -1488,8 +1503,10 @@ const BTN = {
 export default function ThreeDViewer() {
   const [showRoof, setShowRoof] = useState(true);
   const [timeOfDay, setTimeOfDay] = useState(0.75);
-  const [showAllFloors, setShowAllFloors] = useState(false);
-  const { grounds, rooms, floors, activeFloor } = useDesignStore();
+  const { grounds, rooms, floors, activeFloor, showAllFloorsIn3D } =
+    useDesignStore();
+
+  const showAllFloors = showAllFloorsIn3D;
 
   // Count how many floors actually have content
   const populatedFloors = floors.filter(
@@ -1541,25 +1558,6 @@ export default function ThreeDViewer() {
           {showRoof ? "⊡ Close Roof" : "🏠 Interior View"}
         </button>
 
-        {/* All-Floors toggle — only show when >1 populated floor exists */}
-        {populatedFloors.length > 1 && (
-          <button
-            onClick={() => setShowAllFloors((v) => !v)}
-            style={{
-              ...BTN,
-              border: showAllFloors
-                ? "1px solid #4f8ef7"
-                : "1px solid rgba(255,255,255,0.12)",
-              background: showAllFloors
-                ? "rgba(30,60,120,0.85)"
-                : BTN.background,
-              color: showAllFloors ? "#90c8ff" : "#e6edf3",
-            }}
-          >
-            🏢 {showAllFloors ? "Single Floor" : "View All Floors"}
-          </button>
-        )}
-
         {/* Floor level legend (shown in all-floors mode) */}
         {showAllFloors && populatedFloors.length > 1 && (
           <div
@@ -1600,8 +1598,7 @@ export default function ThreeDViewer() {
                     width: 10,
                     height: 10,
                     borderRadius: 3,
-                    background:
-                      f.id === activeFloor ? "#4f8ef7" : "#4a5568",
+                    background: f.id === activeFloor ? "#4f8ef7" : "#4a5568",
                     flexShrink: 0,
                   }}
                 />

@@ -898,6 +898,83 @@ html, body, #root {
   justify-content: center;
 }
 
+.preview-all-floors-graphic {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(160deg, #1e293b 0%, #0f172a 55%, #172554 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.stacked-building {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  transform: perspective(120px) rotateX(8deg);
+}
+
+.stacked-floor {
+  width: 72px;
+  border-radius: 5px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.stacked-floor.upper {
+  height: 28px;
+  background: linear-gradient(135deg, #64748b, #475569);
+}
+
+.stacked-floor.ground {
+  height: 32px;
+  background: linear-gradient(135deg, #475569, #334155);
+}
+
+.stacked-window {
+  width: 14px;
+  height: 12px;
+  border-radius: 2px;
+  background: rgba(147, 197, 253, 0.35);
+  border: 1px solid rgba(191, 219, 254, 0.35);
+}
+
+.stacked-window.wide {
+  width: 22px;
+}
+
+.stacked-door {
+  width: 10px;
+  height: 18px;
+  border-radius: 2px 2px 0 0;
+  background: rgba(251, 191, 36, 0.45);
+  border: 1px solid rgba(252, 211, 77, 0.4);
+  align-self: flex-end;
+  margin-bottom: -4px;
+}
+
+.floor-count-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #bfdbfe;
+  background: rgba(37, 99, 235, 0.2);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  border-radius: 99px;
+  padding: 3px 8px;
+}
+
 .building-façade {
   width: 86px;
   height: 76px;

@@ -376,6 +376,7 @@ export const useDesignStore = create(
     ],
 
     viewMode: "2d", // '2d' | '3d' | 'walkthrough' | 'vr'
+    showAllFloorsIn3D: false,
     activeTool: "select", // 'select' | 'ground' | 'room' | 'door' | 'window' | 'furniture'
     activeFloor: 0,
     floors: [
@@ -468,13 +469,20 @@ export const useDesignStore = create(
     },
 
     // ─── Actions ──────────────────────────────────────────────────────────────────
-    setViewMode: (mode) =>
+    setViewMode: (mode, options = {}) =>
       set((s) => {
-        if (mode !== "3d") return { viewMode: mode };
+        const showAllFloorsIn3D =
+          mode === "3d" ? Boolean(options.allFloors) : false;
+
+        if (mode !== "3d") {
+          return { viewMode: mode, showAllFloorsIn3D: false };
+        }
+
         const hasGround = s.grounds.some((g) => g.floor === s.activeFloor);
-        if (!hasGround) return { viewMode: mode };
+        const next = { viewMode: mode, showAllFloorsIn3D };
+        if (!hasGround) return next;
         return {
-          viewMode: mode,
+          ...next,
           groundPreviewed3D: { ...s.groundPreviewed3D, [s.activeFloor]: true },
         };
       }),
