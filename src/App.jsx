@@ -112,7 +112,7 @@ export default function App() {
             )}
           </div>
 
-          {/* Bottom panel: AI bot + Floor manager */}
+          {/* Bottom panel: Floor manager */}
           <BottomPanel />
         </div>
 

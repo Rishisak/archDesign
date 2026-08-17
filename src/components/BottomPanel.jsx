@@ -19,10 +19,6 @@ export default function BottomPanel() {
   const [collapsed, setCollapsed] = useState(false);
   const [renamingId, setRenamingId] = useState(null);
   const [renameValue, setRenameValue] = useState('');
-  const [aiInput, setAiInput] = useState('');
-  const [aiMessages, setAiMessages] = useState([
-    { role: 'ai', text: "Hi! I'm your AI design assistant. Ask me anything about your floor plan." }
-  ]);
 
   // ── Drag-resize logic ────────────────────────────────────────────────────
   const isDragging = useRef(false);
@@ -77,17 +73,6 @@ export default function BottomPanel() {
     setRenamingId(null);
   };
 
-  const handleAiSend = () => {
-    const trimmed = aiInput.trim();
-    if (!trimmed) return;
-    setAiMessages((prev) => [
-      ...prev,
-      { role: 'user', text: trimmed },
-      { role: 'ai', text: 'AI design features are coming soon! Stay tuned for smart suggestions.' }
-    ]);
-    setAiInput('');
-  };
-
   return (
     <div
       className="bottom-panel-wrapper"
@@ -122,42 +107,6 @@ export default function BottomPanel() {
       {/* Collapsible body */}
       {!collapsed && (
         <div className="bottom-panel-body">
-          {/* AI Assistant section */}
-          <div className="bottom-ai-section">
-            <div className="bottom-ai-header">
-              <div className="bottom-ai-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="8" r="4"/>
-                  <path d="M6 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/>
-                </svg>
-              </div>
-              <div>
-                <div className="bottom-ai-title">AI Assistant</div>
-                <div className="bottom-ai-subtitle">Design intelligence</div>
-              </div>
-              <span className="bottom-ai-soon-badge">BETA</span>
-            </div>
-            <div className="bottom-ai-messages">
-              {aiMessages.map((msg, i) => (
-                <div key={i} className={`bottom-ai-msg ${msg.role}`}>{msg.text}</div>
-              ))}
-            </div>
-            <div className="bottom-ai-input-row">
-              <input
-                className="bottom-ai-input"
-                value={aiInput}
-                onChange={(e) => setAiInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAiSend()}
-                placeholder="Ask about your design..."
-              />
-              <button className="bottom-ai-send-btn" onClick={handleAiSend}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-
           {/* Floors list section */}
           <div className="bottom-floors-section">
             <div className="bottom-section-label">Floors</div>
