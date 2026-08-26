@@ -236,25 +236,29 @@ function MiniScene({ showAllFloors }) {
     const maxZ = Math.max(...source.map((p) => p.y)) * SC;
     const totalH = visFloorIds.length * STOREY_H;
     return {
-      center: [(minX + maxX) / 2, totalH / 2, (minZ + maxZ) / 2],
+      center: [(minX + maxX) / 2, Math.max(totalH * 0.45, 0.8), (minZ + maxZ) / 2],
       extent: Math.max(maxX - minX, maxZ - minZ, 1),
     };
   }, [visGrounds, rooms, visFloorIds]);
 
-  const dist = extent * (showAllFloors ? 1.8 : 1.5);
-  const camPos = [center[0] + dist * 0.85, center[1] + dist * 1.1, center[2] + dist * 0.85];
+  const dist = extent * (showAllFloors ? 1.35 : 1.15);
+  const camPos = [
+    center[0] + dist * 0.75,
+    center[1] + dist * 0.9,
+    center[2] + dist * 0.75,
+  ];
 
   if (visGrounds.length === 0) {
     return (
       <>
         <ambientLight intensity={0.75} color="#fff8f0" />
         <directionalLight position={[5, 8, 5]} intensity={1.4} color="#fff4e0" castShadow />
-        <PerspectiveCamera makeDefault position={[4, 5, 4]} fov={42} near={0.1} far={200} />
+        <PerspectiveCamera makeDefault position={[3.6, 4.2, 3.6]} fov={38} near={0.1} far={200} />
         <OrbitControls
           target={[0, 1, 0]}
           enableDamping dampingFactor={0.08}
           autoRotate autoRotateSpeed={0.6}
-          minDistance={2} maxDistance={20}
+          minDistance={1} maxDistance={20}
           maxPolarAngle={Math.PI / 2.05}
         />
         <PlaceholderBuilding />
@@ -264,10 +268,10 @@ function MiniScene({ showAllFloors }) {
 
   return (
     <>
-      <ambientLight intensity={0.55} color="#fff4e8" />
+      <ambientLight intensity={0.65} color="#fff4e8" />
       <directionalLight
         position={[center[0] + 12, center[1] + 16, center[2] + 8]}
-        intensity={1.4}
+        intensity={1.5}
         color="#fff8f0"
         castShadow
         shadow-mapSize-width={512}
@@ -280,14 +284,14 @@ function MiniScene({ showAllFloors }) {
         shadow-camera-bottom={-25}
         shadow-bias={-0.001}
       />
-      <hemisphereLight skyColor="#fff8f0" groundColor="#806040" intensity={0.3} />
+      <hemisphereLight skyColor="#fff8f0" groundColor="#806040" intensity={0.35} />
 
-      <PerspectiveCamera makeDefault position={camPos} fov={42} near={0.1} far={200} />
+      <PerspectiveCamera makeDefault position={camPos} fov={38} near={0.1} far={200} />
       <OrbitControls
         target={center}
         enableDamping dampingFactor={0.08}
         autoRotate autoRotateSpeed={0.5}
-        minDistance={1} maxDistance={80}
+        minDistance={0.5} maxDistance={80}
         maxPolarAngle={Math.PI / 2.05}
         enableZoom={false}
         enablePan={false}
@@ -329,11 +333,11 @@ function MiniScene({ showAllFloors }) {
 
 export default function MiniThreeDPreview({ showAllFloors = false }) {
   return (
-    <div style={{ width: "100%", height: "100%", background: "#1a2030", borderRadius: "inherit", overflow: "hidden" }}>
+    <div style={{ width: "100%", height: "100%", background: "#151924", borderRadius: "inherit", overflow: "hidden" }}>
       <Canvas
         shadows={{ type: "PCFSoftShadowMap" }}
-        gl={{ antialias: true, toneMapping: 3, toneMappingExposure: 1.15 }}
-        dpr={[1, 1.5]}
+        gl={{ antialias: true, toneMapping: 3, toneMappingExposure: 1.25 }}
+        dpr={[1, 2]}
       >
         <Suspense fallback={null}>
           <MiniScene showAllFloors={showAllFloors} />

@@ -381,7 +381,6 @@ export const useDesignStore = create(
     activeFloor: 0,
     floors: [
       { id: 0, name: "Ground Floor", height: 0 },
-      { id: 1, name: "1st Floor", height: 300 },
     ],
     selectedId: null,
     showAIPanel: true,

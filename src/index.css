@@ -1000,17 +1000,25 @@ html, body, #root {
 
 .floor-count-badge {
   position: absolute;
-  top: 8px;
+  bottom: 8px;
   right: 8px;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #bfdbfe;
-  background: rgba(37, 99, 235, 0.2);
-  border: 1px solid rgba(96, 165, 250, 0.35);
-  border-radius: 99px;
+  color: #60a5fa;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  border-radius: 6px;
   padding: 3px 8px;
+  white-space: nowrap;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  z-index: 10;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 .building-façade {

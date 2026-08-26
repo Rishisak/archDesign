@@ -600,10 +600,7 @@ export default function RightPanel() {
               <MiniThreeDPreview showAllFloors={true} />
             </Suspense>
             {floorCount > 1 && (
-              <span
-                className="floor-count-badge"
-                style={{ position: 'absolute', bottom: 8, right: 8, zIndex: 10, pointerEvents: 'none' }}
-              >
+              <span className="floor-count-badge">
                 {floorCount} floors
               </span>
             )}
