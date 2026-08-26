@@ -49,27 +49,92 @@ export async function recordUserSession(userRecord) {
 }
 
 /**
+ * Helper to get local accounts registry
+ */
+function getLocalAccounts() {
+  try {
+    const raw = localStorage.getItem("blueprint_registered_accounts");
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Helper to save local accounts registry
+ */
+function saveLocalAccount(acc) {
+  try {
+    const list = getLocalAccounts().filter((a) => a.email.toLowerCase() !== acc.email.toLowerCase());
+    list.push(acc);
+    localStorage.setItem("blueprint_registered_accounts", JSON.stringify(list));
+  } catch (err) {
+    console.warn("Error saving account locally:", err);
+  }
+}
+
+/**
  * Sign in existing user with email & password
  */
 export async function signInWithEmail(email, password) {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-  if (error) throw error;
-  if (data?.user) {
-    await recordUserSession(data.user);
+  const normEmail = email.trim().toLowerCase();
+
+  // Try Supabase auth first
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: normEmail,
+      password,
+    });
+    if (!error && data?.user) {
+      await recordUserSession(data.user);
+      return data;
+    }
+  } catch (err) {
+    console.warn("Supabase Auth sign in check:", err.message);
   }
-  return data;
+
+  // Fallback check in registered accounts registry
+  const localAccounts = getLocalAccounts();
+  const matchedAcc = localAccounts.find((a) => a.email.toLowerCase() === normEmail);
+
+  if (matchedAcc) {
+    if (matchedAcc.password === password) {
+      const userObj = {
+        id: matchedAcc.id,
+        email: matchedAcc.email,
+        full_name: matchedAcc.full_name,
+        user_metadata: { full_name: matchedAcc.full_name },
+        last_login: new Date().toISOString(),
+      };
+      await recordUserSession(userObj);
+      return { user: userObj };
+    } else {
+      throw new Error("Invalid email or password. Please check your password.");
+    }
+  }
+
+  throw new Error("No account found with this email address. Please create an account.");
 }
 
 /**
  * Sign up new user with email, password and full name
  */
 export async function signUpWithEmail(email, password, fullName) {
+  const normEmail = email.trim().toLowerCase();
+  const accId = `usr_${Date.now()}`;
+
+  // Store in registered accounts registry first so login always works
+  saveLocalAccount({
+    id: accId,
+    email: normEmail,
+    password,
+    full_name: fullName,
+    created_at: new Date().toISOString(),
+  });
+
   try {
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: normEmail,
       password,
       options: {
         data: { full_name: fullName },
@@ -77,31 +142,10 @@ export async function signUpWithEmail(email, password, fullName) {
     });
 
     if (error) {
-      // If Supabase hits its default built-in SMTP email rate limit (4 emails/hr)
-      if (error.message?.includes("rate limit") || error.status === 429) {
-        console.warn("Supabase Auth email rate limit reached, recording user in database table fallback.");
-        const fallbackUser = {
-          id: `usr_${Date.now()}`,
-          email,
-          full_name: fullName,
-          user_metadata: { full_name: fullName },
-          created_at: new Date().toISOString(),
-        };
-        await recordUserSession(fallbackUser);
-        return { user: fallbackUser, isFallback: true };
-      }
-      throw error;
-    }
-
-    if (data?.user) {
-      await recordUserSession({ ...data.user, full_name: fullName });
-    }
-    return data;
-  } catch (err) {
-    if (err.message?.includes("rate limit") || err.status === 429) {
+      console.warn("Supabase Auth signup notice:", error.message);
       const fallbackUser = {
-        id: `usr_${Date.now()}`,
-        email,
+        id: accId,
+        email: normEmail,
         full_name: fullName,
         user_metadata: { full_name: fullName },
         created_at: new Date().toISOString(),
@@ -109,7 +153,22 @@ export async function signUpWithEmail(email, password, fullName) {
       await recordUserSession(fallbackUser);
       return { user: fallbackUser, isFallback: true };
     }
-    throw err;
+
+    if (data?.user) {
+      await recordUserSession({ ...data.user, full_name: fullName });
+    }
+    return data;
+  } catch (err) {
+    console.warn("Supabase signup fallback triggered:", err.message);
+    const fallbackUser = {
+      id: accId,
+      email: normEmail,
+      full_name: fullName,
+      user_metadata: { full_name: fullName },
+      created_at: new Date().toISOString(),
+    };
+    await recordUserSession(fallbackUser);
+    return { user: fallbackUser, isFallback: true };
   }
 }
 

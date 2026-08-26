@@ -8,6 +8,7 @@ const VIEWS = [
 ];
 
 export default function Header({ currentUser, onSignOut }) {
+  const [showProfileCard, setShowProfileCard] = React.useState(false);
   const {
     viewMode, setViewMode,
     showAIPanel, setShowAIPanel,
@@ -15,8 +16,16 @@ export default function Header({ currentUser, onSignOut }) {
     snapToGrid, setSnapToGrid,
     clearDesign, loadDemo,
     exportProjectJSON,
-    undo, redo, canUndo, canRedo
+    undo, redo, canUndo, canRedo,
+    rooms = [], floors = []
   } = useDesignStore();
+
+  const userInitials = (currentUser?.full_name || currentUser?.email || 'U')
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .substring(0, 2)
+    .toUpperCase();
 
   return (
     <header style={{
@@ -29,7 +38,8 @@ export default function Header({ currentUser, onSignOut }) {
       flexShrink: 0,
       zIndex: 100,
       gap: 0,
-      overflow: 'hidden',
+      overflow: 'visible',
+      position: 'relative',
     }}>
       {/* Logo */}
       <div className="header-logo">
@@ -164,39 +174,71 @@ export default function Header({ currentUser, onSignOut }) {
         {currentUser && (
           <>
             <div className="header-divider" style={{ margin: '0 4px' }} />
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                background: 'var(--bg-quaternary, rgba(255,255,255,0.06))',
-                border: '1px solid var(--border)',
-                borderRadius: 20,
-                padding: '4px 10px',
-                fontSize: 12,
-                color: 'var(--text-primary)',
-              }}
-            >
-              <span style={{ fontSize: 13 }}>{currentUser.is_guest ? '👤' : '✨'}</span>
-              <span style={{ fontWeight: 600, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {currentUser.full_name || currentUser.email || 'User'}
-              </span>
+            <div style={{ position: 'relative' }}>
               <button
-                onClick={onSignOut}
-                title="Sign out"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-muted)',
-                  cursor: 'pointer',
-                  fontSize: 11,
-                  padding: '2px 4px',
-                  borderRadius: 4,
-                  lineHeight: 1,
-                }}
+                onClick={() => setShowProfileCard(!showProfileCard)}
+                className="user-profile-trigger-btn"
+                title="View Profile & Settings"
               >
-                ✕
+                <div className="user-avatar-circle">
+                  {currentUser.is_guest ? '👤' : userInitials}
+                </div>
+                <span className="user-profile-name">
+                  {currentUser.full_name || currentUser.email || 'Architect'}
+                </span>
+                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>▾</span>
               </button>
+
+              {/* ── PROFILE CARD DROPDOWN ── */}
+              {showProfileCard && (
+                <div className="user-profile-dropdown-card">
+                  <div className="profile-card-header">
+                    <div className="user-avatar-circle large">
+                      {currentUser.is_guest ? '👤' : userInitials}
+                    </div>
+                    <div className="profile-card-title-block">
+                      <div className="profile-card-name">
+                        {currentUser.full_name || 'Architect'}
+                      </div>
+                      <div className="profile-card-email">
+                        {currentUser.email || 'guest@blueprint.studio'}
+                      </div>
+                      <div className="profile-card-role-tag">
+                        {currentUser.is_guest ? 'Guest Session' : 'Registered Architect'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="profile-card-divider" />
+
+                  <div className="profile-card-stats">
+                    <div className="profile-stat-item">
+                      <span className="stat-label">Total Rooms</span>
+                      <span className="stat-val">{rooms.length}</span>
+                    </div>
+                    <div className="profile-stat-item">
+                      <span className="stat-label">Floors</span>
+                      <span className="stat-val">{floors.length}</span>
+                    </div>
+                    <div className="profile-stat-item">
+                      <span className="stat-label">Storage</span>
+                      <span className="stat-val" style={{ color: '#60a5fa' }}>Supabase</span>
+                    </div>
+                  </div>
+
+                  <div className="profile-card-divider" />
+
+                  <button
+                    className="profile-card-logout-btn"
+                    onClick={() => {
+                      setShowProfileCard(false);
+                      onSignOut();
+                    }}
+                  >
+                    <span>🚪 Log Out</span>
+                  </button>
+                </div>
+              )}
             </div>
           </>
         )}
