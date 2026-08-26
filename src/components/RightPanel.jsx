@@ -1,5 +1,25 @@
-import React from "react";
+import React, { Suspense } from "react";
 import { useDesignStore } from "../store/designStore";
+
+const MiniThreeDPreview = React.lazy(() => import('./MiniThreeDPreview'));
+
+function Mini3DLoading() {
+  return (
+    <div style={{
+      width: '100%', height: '100%',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: '#1a2030',
+    }}>
+      <div style={{
+        width: 22, height: 22,
+        border: '2px solid rgba(255,255,255,0.1)',
+        borderTop: '2px solid #4f8ef7',
+        borderRadius: '50%',
+        animation: 'spin 0.8s linear infinite',
+      }} />
+    </div>
+  );
+}
 
 export const LIBRARY_ITEMS = [
   {
@@ -542,21 +562,12 @@ export default function RightPanel() {
           <div
             className="preview-thumbnail-container"
             onClick={() => open3DView(false)}
+            style={{ position: 'relative', overflow: 'hidden' }}
           >
-            <div className="preview-3d-iso-graphic">
-              <div className="iso-building-box">
-                <div className="iso-wall front" />
-                <div className="iso-wall side" />
-                <div className="iso-roof-top">
-                  <div className="room-layout-3d-mini">
-                    <div className="mini-bed" />
-                    <div className="mini-sofa" />
-                    <div className="mini-table" />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="preview-overlay-hover">
+            <Suspense fallback={<Mini3DLoading />}>
+              <MiniThreeDPreview showAllFloors={false} />
+            </Suspense>
+            <div className="preview-overlay-hover" style={{ pointerEvents: 'none' }}>
               {isSingleFloor3D
                 ? "✓ Currently Active View"
                 : "Click to Switch to 3D Floor View"}
@@ -583,23 +594,20 @@ export default function RightPanel() {
           <div
             className="preview-thumbnail-container"
             onClick={() => open3DView(true)}
+            style={{ position: 'relative', overflow: 'hidden' }}
           >
-            <div className="preview-all-floors-graphic">
-              <div className="stacked-building">
-                <div className="stacked-floor upper">
-                  <div className="stacked-window" />
-                  <div className="stacked-window" />
-                </div>
-                <div className="stacked-floor ground">
-                  <div className="stacked-window wide" />
-                  <div className="stacked-door" />
-                </div>
-              </div>
-              {floorCount > 1 && (
-                <span className="floor-count-badge">{floorCount} floors</span>
-              )}
-            </div>
-            <div className="preview-overlay-hover">
+            <Suspense fallback={<Mini3DLoading />}>
+              <MiniThreeDPreview showAllFloors={true} />
+            </Suspense>
+            {floorCount > 1 && (
+              <span
+                className="floor-count-badge"
+                style={{ position: 'absolute', bottom: 8, right: 8, zIndex: 10, pointerEvents: 'none' }}
+              >
+                {floorCount} floors
+              </span>
+            )}
+            <div className="preview-overlay-hover" style={{ pointerEvents: 'none' }}>
               {isAllFloors3D
                 ? "✓ Currently Active View"
                 : "Click to View Entire Building in 3D"}
