@@ -217,28 +217,73 @@ export async function loginAsGuestSession(customGuestName) {
 }
 
 /**
- * Fetch projects for a user from Supabase user_projects table with localStorage fallback
+ * Helper to get user ID and normalized email from argument
  */
-export async function fetchUserProjects(userId) {
-  if (!userId) return [];
-  const localKey = `blueprint_user_projects_${userId}`;
-  let localProjects = [];
-
-  try {
-    const raw = localStorage.getItem(localKey);
-    if (raw) localProjects = JSON.parse(raw);
-  } catch (err) {
-    console.warn("Error reading local projects:", err);
+function extractUserInfo(userOrId) {
+  if (!userOrId) return { id: "", email: "" };
+  if (typeof userOrId === "object") {
+    return {
+      id: userOrId.id || userOrId.email || "",
+      email: userOrId.email ? userOrId.email.toLowerCase() : "",
+    };
   }
+  const str = String(userOrId).trim();
+  const isEmail = str.includes("@");
+  return {
+    id: str,
+    email: isEmail ? str.toLowerCase() : "",
+  };
+}
 
+/**
+ * Fetch projects for a user from Supabase user_projects table & localStorage fallback.
+ * Queries by user_id and email so saved projects are always visible whenever the user logs in.
+ */
+export async function fetchUserProjects(userOrId) {
+  const { id, email } = extractUserInfo(userOrId);
+  if (!id && !email) return [];
+
+  const keys = new Set();
+  if (id) keys.add(`blueprint_user_projects_${id}`);
+  if (email) keys.add(`blueprint_user_projects_${email}`);
+
+  let localProjects = [];
+  keys.forEach((key) => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          localProjects = [...localProjects, ...parsed];
+        }
+      }
+    } catch (err) {
+      console.warn("Error reading local projects for key", key, err);
+    }
+  });
+
+  // Deduplicate local projects by id
+  const localMap = new Map();
+  localProjects.forEach((p) => localMap.set(p.id, p));
+
+  // Try querying Supabase database
   try {
-    const { data, error } = await supabase
-      .from("user_projects")
-      .select("*")
-      .eq("user_id", userId)
-      .order("updated_at", { ascending: false });
+    let query = supabase.from("user_projects").select("*");
+    
+    if (id && email) {
+      query = query.or(`user_id.eq.${id},user_id.eq.${email}`);
+    } else if (id) {
+      query = query.eq("user_id", id);
+    } else {
+      query = query.eq("user_id", email);
+    }
 
-    if (!error && Array.isArray(data) && data.length > 0) {
+    const { data, error } = await query.order("updated_at", { ascending: false });
+
+    if (error) {
+      console.warn("Supabase fetch projects note:", error.message);
+      console.info("💡 TIP: Ensure 'user_projects' table is created in Supabase SQL Editor:\nCREATE TABLE user_projects (id text primary key, user_id text, name text, data text, updated_at text, created_at text);");
+    } else if (Array.isArray(data)) {
       const dbProjects = data.map((p) => ({
         id: p.id,
         user_id: p.user_id,
@@ -248,70 +293,93 @@ export async function fetchUserProjects(userId) {
         created_at: p.created_at || new Date().toISOString(),
       }));
 
-      // Merge local and DB projects by ID
-      const map = new Map();
-      localProjects.forEach((p) => map.set(p.id, p));
-      dbProjects.forEach((p) => map.set(p.id, p));
+      // Merge DB projects into localMap
+      dbProjects.forEach((p) => localMap.set(p.id, p));
 
-      const merged = Array.from(map.values()).sort(
+      const merged = Array.from(localMap.values()).sort(
         (a, b) => new Date(b.updated_at) - new Date(a.updated_at)
       );
 
-      localStorage.setItem(localKey, JSON.stringify(merged));
+      // Save merged list back to all user keys
+      keys.forEach((key) => {
+        try {
+          localStorage.setItem(key, JSON.stringify(merged));
+        } catch (e) {
+          console.warn("Storage sync note:", e);
+        }
+      });
+
       return merged;
     }
   } catch (err) {
     console.warn("Supabase fetch projects error:", err.message);
   }
 
-  return localProjects;
+  const finalLocal = Array.from(localMap.values()).sort(
+    (a, b) => new Date(b.updated_at) - new Date(a.updated_at)
+  );
+  return finalLocal;
 }
 
 /**
  * Save a user project to Supabase user_projects table & localStorage
  */
-export async function saveUserProject(userId, project) {
-  if (!userId) return null;
-  const localKey = `blueprint_user_projects_${userId}`;
-  const now = new Date().toISOString();
+export async function saveUserProject(userOrId, project) {
+  const { id, email } = extractUserInfo(userOrId);
+  const primaryUserId = id || email || "guest_user";
+  if (!primaryUserId) return null;
 
+  const now = new Date().toISOString();
   const projectRecord = {
     id: project.id || `proj_${Date.now()}`,
-    user_id: userId,
+    user_id: primaryUserId,
     name: project.name || "New Architectural Blueprint",
     data: project.data,
     updated_at: now,
     created_at: project.created_at || now,
   };
 
-  // Save locally
+  // Save to local storage cache for both user_id and email keys
+  const keys = new Set([`blueprint_user_projects_${primaryUserId}`]);
+  if (id) keys.add(`blueprint_user_projects_${id}`);
+  if (email) keys.add(`blueprint_user_projects_${email}`);
+
   try {
-    const current = await fetchUserProjects(userId);
+    const current = await fetchUserProjects(userOrId);
     const updated = [projectRecord, ...current.filter((p) => p.id !== projectRecord.id)];
-    localStorage.setItem(localKey, JSON.stringify(updated));
+    keys.forEach((key) => localStorage.setItem(key, JSON.stringify(updated)));
   } catch (err) {
     console.warn("Local project save error:", err);
   }
 
-  // Save to Supabase
+  // Save to Supabase database table `user_projects`
   try {
     const payload = {
-      id: projectRecord.id,
-      user_id: userId,
-      name: projectRecord.name,
-      data: JSON.stringify(projectRecord.data),
+      id: String(projectRecord.id),
+      user_id: String(primaryUserId),
+      name: String(projectRecord.name),
+      data: typeof projectRecord.data === "string" ? projectRecord.data : JSON.stringify(projectRecord.data),
       updated_at: now,
-      created_at: projectRecord.created_at,
     };
 
-    const { error } = await supabase
+    console.log("Upserting project to Supabase user_projects table:", payload);
+
+    const { data: resData, error } = await supabase
       .from("user_projects")
-      .upsert(payload, { onConflict: "id" });
+      .upsert(payload, { onConflict: "id" })
+      .select();
 
     if (error) {
-      console.warn("Supabase save project note:", error.message);
+      console.warn("Supabase upsert error note:", error.message);
+      // Retry without select
+      const { error: retryErr } = await supabase.from("user_projects").upsert(payload);
+      if (retryErr) {
+        console.warn("Supabase retry upsert error:", retryErr.message);
+      } else {
+        console.log("Successfully saved project to Supabase 'user_projects' table on retry!");
+      }
     } else {
-      console.log("Successfully saved project to Supabase database table!");
+      console.log("Successfully saved project to Supabase database table 'user_projects'!", resData);
     }
   } catch (err) {
     console.warn("Supabase project save error:", err);
@@ -323,14 +391,19 @@ export async function saveUserProject(userId, project) {
 /**
  * Delete a user project from Supabase & localStorage
  */
-export async function deleteUserProject(userId, projectId) {
-  if (!userId || !projectId) return;
-  const localKey = `blueprint_user_projects_${userId}`;
+export async function deleteUserProject(userOrId, projectId) {
+  const { id, email } = extractUserInfo(userOrId);
+  const primaryUserId = id || email || "guest_user";
+  if (!primaryUserId || !projectId) return;
+
+  const keys = new Set([`blueprint_user_projects_${primaryUserId}`]);
+  if (id) keys.add(`blueprint_user_projects_${id}`);
+  if (email) keys.add(`blueprint_user_projects_${email}`);
 
   try {
-    const current = await fetchUserProjects(userId);
+    const current = await fetchUserProjects(userOrId);
     const updated = current.filter((p) => p.id !== projectId);
-    localStorage.setItem(localKey, JSON.stringify(updated));
+    keys.forEach((key) => localStorage.setItem(key, JSON.stringify(updated)));
   } catch (err) {
     console.warn("Local project delete error:", err);
   }
@@ -339,8 +412,7 @@ export async function deleteUserProject(userId, projectId) {
     const { error } = await supabase
       .from("user_projects")
       .delete()
-      .eq("id", projectId)
-      .eq("user_id", userId);
+      .eq("id", projectId);
 
     if (error) {
       console.warn("Supabase delete project note:", error.message);
@@ -349,4 +421,5 @@ export async function deleteUserProject(userId, projectId) {
     console.warn("Supabase delete project error:", err);
   }
 }
+
 

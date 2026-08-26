@@ -50,7 +50,7 @@ export default function Header({ currentUser, onSignOut, onBackToDashboard }) {
   const handleSaveProject = async () => {
     try {
       const snapshot = getProjectSnapshot();
-      await saveUserProject(userId, {
+      await saveUserProject(currentUser || userId, {
         id: currentProjectId || `proj_${Date.now()}`,
         name: projectName || "My Project",
         data: snapshot,

@@ -27,7 +27,7 @@ export default function Dashboard({ user, onSignOut, onOpenStudio }) {
   const loadProjects = async () => {
     setLoading(true);
     try {
-      const list = await fetchUserProjects(userId);
+      const list = await fetchUserProjects(user);
       setProjects(list || []);
     } catch (err) {
       console.warn("Failed to load projects:", err);
@@ -38,7 +38,7 @@ export default function Dashboard({ user, onSignOut, onOpenStudio }) {
 
   useEffect(() => {
     loadProjects();
-  }, [userId]);
+  }, [user?.id, user?.email]);
 
   // Filter projects by search
   const filteredProjects = useMemo(() => {
@@ -59,7 +59,7 @@ export default function Dashboard({ user, onSignOut, onOpenStudio }) {
     const snapshot = useDesignStore.getState().getProjectSnapshot();
     const currentId = useDesignStore.getState().currentProjectId;
     
-    await saveUserProject(userId, {
+    await saveUserProject(user, {
       id: currentId,
       name: finalName,
       data: snapshot,
@@ -78,7 +78,7 @@ export default function Dashboard({ user, onSignOut, onOpenStudio }) {
     const snapshot = useDesignStore.getState().getProjectSnapshot();
     const currentId = useDesignStore.getState().currentProjectId;
 
-    await saveUserProject(userId, {
+    await saveUserProject(user, {
       id: currentId,
       name: demoName,
       data: snapshot,
@@ -95,7 +95,7 @@ export default function Dashboard({ user, onSignOut, onOpenStudio }) {
 
   // Delete project
   const handleDeleteProject = async (projectId) => {
-    await deleteUserProject(userId, projectId);
+    await deleteUserProject(user, projectId);
     setProjects((prev) => prev.filter((p) => p.id !== projectId));
     setDeletingId(null);
   };
