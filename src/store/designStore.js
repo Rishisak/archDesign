@@ -385,6 +385,7 @@ export const useDesignStore = create(
     ],
     selectedId: null,
     showAIPanel: true,
+    showRightPanel: true,
     showLibrary: false,
     zoom: 1,
     panX: 0,
@@ -583,6 +584,8 @@ export const useDesignStore = create(
 
     setSelectedId: (id) => set({ selectedId: id }),
     setShowAIPanel: (v) => set({ showAIPanel: v }),
+    setShowRightPanel: (v) => set({ showRightPanel: v }),
+    toggleRightPanel: () => set((s) => ({ showRightPanel: !s.showRightPanel })),
     setShowLibrary: (v) => set({ showLibrary: v }),
     setZoom: (zoom) => set({ zoom: Math.min(3, Math.max(0.2, zoom)) }),
     setPan: (panX, panY) => set({ panX, panY }),
@@ -893,11 +896,13 @@ export const useDesignStore = create(
     // Furniture
     addFurniture: (item) => {
       saveHistory(get, set, true);
+      const id = genId("furn");
       set((s) => ({
         furniture: [
           ...s.furniture,
-          { id: genId("furn"), floor: s.activeFloor, ...item },
+          { ...item, id, floor: s.activeFloor },
         ],
+        selectedId: id,
       }));
     },
     updateFurniture: (id, patch) => {

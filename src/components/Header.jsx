@@ -11,6 +11,7 @@ export default function Header() {
   const {
     viewMode, setViewMode,
     showAIPanel, setShowAIPanel,
+    showRightPanel, toggleRightPanel,
     snapToGrid, setSnapToGrid,
     clearDesign, loadDemo,
     exportProjectJSON,
@@ -113,6 +114,19 @@ export default function Header() {
             <rect x="9" y="2" width="5" height="5" rx="1"/>
             <rect x="2" y="9" width="5" height="5" rx="1"/>
             <rect x="9" y="9" width="5" height="5" rx="1"/>
+          </svg>
+        </button>
+
+        {/* Right panel */}
+        <button
+          className={`icon-btn ${showRightPanel ? 'active' : ''}`}
+          onClick={toggleRightPanel}
+          title={showRightPanel ? 'Hide right panel' : 'Show right panel'}
+          aria-label="Toggle right panel"
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="2" y="2" width="12" height="12" rx="1.5"/>
+            <path d="M11 2v12"/>
           </svg>
         </button>
 

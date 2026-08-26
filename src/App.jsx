@@ -29,7 +29,7 @@ function ViewerLoading() {
 }
 
 export default function App() {
-  const { viewMode } = useDesignStore();
+  const { viewMode, showRightPanel, setShowRightPanel } = useDesignStore();
   const is2D = viewMode === '2d';
 
   useEffect(() => {
@@ -116,8 +116,17 @@ export default function App() {
           <BottomPanel />
         </div>
 
-        {/* Right panel */}
-        <RightPanel />
+        {showRightPanel ? (
+          <RightPanel />
+        ) : (
+          <button
+            className="right-panel-reopen-tab"
+            onClick={() => setShowRightPanel(true)}
+            title="Show right panel"
+          >
+            ‹ Views
+          </button>
+        )}
       </div>
     </div>
   );

@@ -121,8 +121,273 @@ export const LIBRARY_ITEMS = [
   },
 ];
 
+const FURN_COLORS = [
+  "#546e7a", "#37474f", "#78909c", "#4e342e", "#6d4c41",
+  "#8e24aa", "#ab47bc", "#1e88e5", "#42a5f5", "#2e7d32",
+  "#c8923a", "#e53935", "#f9a825", "#00897b", "#212121",
+  "#d4b483", "#ffffff", "#f5f5f5", "#b0bec5", "#607d8b",
+];
+
+function useSelectedFurniture() {
+  const furniture = useDesignStore((s) => s.furniture);
+  const selectedId = useDesignStore((s) => s.selectedId);
+  return furniture.find((f) => f.id === selectedId) || null;
+}
+
+function FurniturePropertiesForm({ compact = false }) {
+  const selFurn = useSelectedFurniture();
+  const setSelectedId = useDesignStore((s) => s.setSelectedId);
+  const updateFurniture = useDesignStore((s) => s.updateFurniture);
+  const deleteFurniture = useDesignStore((s) => s.deleteFurniture);
+  const addFurniture = useDesignStore((s) => s.addFurniture);
+
+  const [wStr, setWStr] = React.useState("");
+  const [hStr, setHStr] = React.useState("");
+
+  React.useEffect(() => {
+    if (selFurn) {
+      setWStr(String(selFurn.width ?? ""));
+      setHStr(String(selFurn.height ?? ""));
+    }
+  }, [selFurn?.id]);
+
+  if (!selFurn) return null;
+
+  const rot = selFurn.rotation ?? 0;
+  const opacity = selFurn.opacity ?? 1;
+  const flipH = selFurn.flipH ?? false;
+  const update = (patch) => updateFurniture(selFurn.id, patch);
+
+  const commitWidth = () => {
+    const v = parseFloat(wStr);
+    if (!isNaN(v) && v > 0) update({ width: v });
+    else setWStr(String(selFurn.width));
+  };
+
+  const commitHeight = () => {
+    const v = parseFloat(hStr);
+    if (!isNaN(v) && v > 0) update({ height: v });
+    else setHStr(String(selFurn.height));
+  };
+
+  const typeIcon = selFurn.type?.startsWith("door")
+    ? "🚪"
+    : selFurn.type?.startsWith("window")
+    ? "🪟"
+    : selFurn.type?.startsWith("bed")
+    ? "🛏️"
+    : selFurn.type?.startsWith("sofa") || selFurn.type === "armchair"
+    ? "🛋️"
+    : selFurn.type?.startsWith("dining") ||
+      selFurn.type?.startsWith("table") ||
+      selFurn.type === "desk" ||
+      selFurn.type === "nightstand"
+    ? "🪑"
+    : "📦";
+
+  return (
+    <div className={compact ? "right-properties-card" : undefined}>
+      <div className="properties-card-header" style={compact ? undefined : { padding: "14px 14px 10px", borderBottom: "1px solid var(--border)" }}>
+        <span className="card-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span>{typeIcon}</span>
+          <span>
+            Properties
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", textTransform: "none", letterSpacing: 0 }}>
+              {selFurn.label || "Furniture"}
+            </div>
+          </span>
+        </span>
+        <button
+          className="close-btn"
+          onClick={() => setSelectedId(null)}
+          title="Deselect"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="properties-form-body" style={compact ? undefined : { padding: 12 }}>
+        <div className="form-group">
+          <label>Label / Name</label>
+          <input
+            className="prop-input"
+            value={selFurn.label || ""}
+            onChange={(e) => update({ label: e.target.value })}
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Size (cm)</label>
+          <div className="input-pair">
+            <div className="labeled-input">
+              <span className="axis-label">W</span>
+              <input
+                className="prop-input"
+                type="number"
+                value={wStr}
+                onChange={(e) => setWStr(e.target.value)}
+                onBlur={commitWidth}
+                onKeyDown={(e) => e.key === "Enter" && commitWidth()}
+              />
+            </div>
+            <div className="labeled-input">
+              <span className="axis-label">D</span>
+              <input
+                className="prop-input"
+                type="number"
+                value={hStr}
+                onChange={(e) => setHStr(e.target.value)}
+                onBlur={commitHeight}
+                onKeyDown={(e) => e.key === "Enter" && commitHeight()}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="form-group">
+          <div className="slider-label-line">
+            <label>Rotation</label>
+            <span>{rot}°</span>
+          </div>
+          <input
+            className="prop-slider"
+            type="range"
+            min={0}
+            max={360}
+            step={1}
+            value={rot}
+            onChange={(e) => update({ rotation: +e.target.value })}
+          />
+          <div className="input-pair" style={{ marginTop: 6 }}>
+            <button type="button" className="btn btn-ghost" onClick={() => update({ rotation: (rot - 90 + 360) % 360 })}>
+              ↺ -90°
+            </button>
+            <button type="button" className="btn btn-ghost" onClick={() => update({ rotation: (rot + 90) % 360 })}>
+              ↻ +90°
+            </button>
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label>Color</label>
+          <div className="color-row">
+            {FURN_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                className={`color-swatch${selFurn.color === c ? " selected" : ""}`}
+                style={{ background: c }}
+                title={c}
+                onClick={() => update({ color: c })}
+              />
+            ))}
+          </div>
+          <div className="color-picker-box" style={{ marginTop: 8 }}>
+            <input
+              className="color-swatch-picker"
+              type="color"
+              value={selFurn.color || "#546e7a"}
+              onChange={(e) => update({ color: e.target.value })}
+            />
+            <input
+              className="prop-input"
+              value={selFurn.color || ""}
+              onChange={(e) => update({ color: e.target.value })}
+              placeholder="#hex"
+              style={{ fontFamily: "monospace" }}
+            />
+          </div>
+        </div>
+
+        <div className="form-group">
+          <div className="slider-label-line">
+            <label>Opacity</label>
+            <span>{Math.round(opacity * 100)}%</span>
+          </div>
+          <input
+            className="prop-slider"
+            type="range"
+            min={0.1}
+            max={1}
+            step={0.05}
+            value={opacity}
+            onChange={(e) => update({ opacity: +e.target.value })}
+          />
+        </div>
+
+        <button
+          type="button"
+          className="btn btn-ghost w-full"
+          onClick={() => update({ flipH: !flipH })}
+          style={{
+            borderColor: flipH ? "var(--accent)" : undefined,
+            color: flipH ? "var(--accent)" : undefined,
+          }}
+        >
+          {flipH ? "↔ Flip ON" : "↔ Flip Horizontal"}
+        </button>
+
+        <div style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", gap: 12 }}>
+          <span>X: {Math.round(selFurn.x ?? 0)}</span>
+          <span>Y: {Math.round(selFurn.y ?? 0)}</span>
+        </div>
+
+        <button
+          type="button"
+          className="btn btn-ghost w-full"
+          onClick={() =>
+            addFurniture({
+              ...selFurn,
+              id: undefined,
+              x: (selFurn.x ?? 0) + 30,
+              y: (selFurn.y ?? 0) + 30,
+            })
+          }
+        >
+          Duplicate Item
+        </button>
+        <button
+          type="button"
+          className="btn btn-danger w-full"
+          onClick={() => {
+            deleteFurniture(selFurn.id);
+            setSelectedId(null);
+          }}
+        >
+          Delete Item
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Overlay used when the right column is hidden so properties stay reachable. */
 export function FurniturePropertiesPanel() {
-  return null;
+  const viewMode = useDesignStore((s) => s.viewMode);
+  const showRightPanel = useDesignStore((s) => s.showRightPanel);
+  const selFurn = useSelectedFurniture();
+
+  if (viewMode !== "2d" || !selFurn || showRightPanel) return null;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        right: 0,
+        top: 0,
+        bottom: 0,
+        width: 280,
+        background: "var(--bg-secondary)",
+        borderLeft: "1px solid var(--border)",
+        zIndex: 200,
+        boxShadow: "-8px 0 32px rgba(0,0,0,0.35)",
+        animation: "slideInRight 0.22s cubic-bezier(0.22,1,0.36,1)",
+        overflowY: "auto",
+      }}
+    >
+      <FurniturePropertiesForm />
+    </div>
+  );
 }
 
 export default function RightPanel() {
@@ -131,8 +396,10 @@ export default function RightPanel() {
     showAllFloorsIn3D = false,
     setViewMode = () => {},
     floors = [],
+    setShowRightPanel = () => {},
   } = useDesignStore() || {};
 
+  const selFurn = useSelectedFurniture();
   const open3DView = (allFloors) => setViewMode("3d", { allFloors });
   const isSingleFloor3D = viewMode === "3d" && !showAllFloorsIn3D;
   const isAllFloors3D = viewMode === "3d" && showAllFloorsIn3D;
@@ -140,7 +407,20 @@ export default function RightPanel() {
 
   return (
     <aside className="right-views-properties-column">
+      <div className="right-panel-toolbar">
+        <span className="right-panel-toolbar-title">
+          {selFurn ? "Properties" : "Views"}
+        </span>
+        <button
+          className="expand-btn"
+          title="Hide right panel"
+          onClick={() => setShowRightPanel(false)}
+        >
+          »
+        </button>
+      </div>
       <div className="right-column-scroll">
+        {viewMode === "2d" && selFurn && <FurniturePropertiesForm compact />}
         {/* Card 1: 2D View (This Floor) */}
         <div
           className={`right-preview-card ${viewMode === "2d" ? "active-view" : ""}`}
