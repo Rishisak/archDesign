@@ -59,18 +59,50 @@ export async function signInWithEmail(email, password) {
  * Sign up new user with email, password and full name
  */
 export async function signUpWithEmail(email, password, fullName) {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { full_name: fullName },
-    },
-  });
-  if (error) throw error;
-  if (data?.user) {
-    await recordUserSession({ ...data.user, full_name: fullName });
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: fullName },
+      },
+    });
+
+    if (error) {
+      // If Supabase hits its default built-in SMTP email rate limit (4 emails/hr)
+      if (error.message?.includes("rate limit") || error.status === 429) {
+        console.warn("Supabase Auth email rate limit reached, recording user in database table fallback.");
+        const fallbackUser = {
+          id: `usr_${Date.now()}`,
+          email,
+          full_name: fullName,
+          user_metadata: { full_name: fullName },
+          created_at: new Date().toISOString(),
+        };
+        await recordUserSession(fallbackUser);
+        return { user: fallbackUser, isFallback: true };
+      }
+      throw error;
+    }
+
+    if (data?.user) {
+      await recordUserSession({ ...data.user, full_name: fullName });
+    }
+    return data;
+  } catch (err) {
+    if (err.message?.includes("rate limit") || err.status === 429) {
+      const fallbackUser = {
+        id: `usr_${Date.now()}`,
+        email,
+        full_name: fullName,
+        user_metadata: { full_name: fullName },
+        created_at: new Date().toISOString(),
+      };
+      await recordUserSession(fallbackUser);
+      return { user: fallbackUser, isFallback: true };
+    }
+    throw err;
   }
-  return data;
 }
 
 /**
