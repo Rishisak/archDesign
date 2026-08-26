@@ -7,7 +7,7 @@ const VIEWS = [
   { id: 'walkthrough', label: 'Walkthrough', icon: '▶' },
 ];
 
-export default function Header() {
+export default function Header({ currentUser, onSignOut }) {
   const {
     viewMode, setViewMode,
     showAIPanel, setShowAIPanel,
@@ -160,6 +160,46 @@ export default function Header() {
             <path d="M3 3l10 10M13 3 3 13"/>
           </svg>
         </button>
+
+        {currentUser && (
+          <>
+            <div className="header-divider" style={{ margin: '0 4px' }} />
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: 'var(--bg-quaternary, rgba(255,255,255,0.06))',
+                border: '1px solid var(--border)',
+                borderRadius: 20,
+                padding: '4px 10px',
+                fontSize: 12,
+                color: 'var(--text-primary)',
+              }}
+            >
+              <span style={{ fontSize: 13 }}>{currentUser.is_guest ? '👤' : '✨'}</span>
+              <span style={{ fontWeight: 600, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {currentUser.full_name || currentUser.email || 'User'}
+              </span>
+              <button
+                onClick={onSignOut}
+                title="Sign out"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  padding: '2px 4px',
+                  borderRadius: 4,
+                  lineHeight: 1,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </header>
   );

@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import './index.css';
 import { useDesignStore } from './store/designStore';
 import Header from './components/Header';
@@ -6,6 +6,7 @@ import Toolbar from './components/Toolbar';
 import Canvas2D from './components/Canvas2D';
 import RightPanel, { FurniturePropertiesPanel } from './components/RightPanel';
 import BottomPanel from './components/BottomPanel';
+import LoginPage from './components/LoginPage';
 
 const ThreeDViewer      = React.lazy(() => import('./components/ThreeDViewer'));
 const WalkthroughViewer = React.lazy(() => import('./components/WalkthroughViewer'));
@@ -31,6 +32,34 @@ function ViewerLoading() {
 export default function App() {
   const { viewMode, showRightPanel, setShowRightPanel } = useDesignStore();
   const is2D = viewMode === '2d';
+
+  // Auth state: check localStorage or default to null (show login page at start)
+  const [user, setUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('blueprint_studio_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const handleLoginSuccess = (userObj) => {
+    setUser(userObj);
+    try {
+      localStorage.setItem('blueprint_studio_user', JSON.stringify(userObj));
+    } catch (err) {
+      console.warn("Storage error:", err);
+    }
+  };
+
+  const handleSignOut = () => {
+    setUser(null);
+    try {
+      localStorage.removeItem('blueprint_studio_user');
+    } catch (err) {
+      console.warn("Storage error:", err);
+    }
+  };
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -70,10 +99,15 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Show login page at start if no user is signed in or entered as guest
+  if (!user) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       {/* Header spans full width */}
-      <Header />
+      <Header currentUser={user} onSignOut={handleSignOut} />
 
       {/* Body row */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
@@ -131,3 +165,4 @@ export default function App() {
     </div>
   );
 }
+
