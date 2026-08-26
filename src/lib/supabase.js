@@ -19,20 +19,28 @@ export async function recordUserSession(userRecord) {
       metadata: JSON.stringify(userRecord),
     };
 
-    // Try inserting into profiles / user_logins table in Supabase
+    console.log("Saving user session to Supabase project (https://jkdjboxmtajkuxxecppo.supabase.co):", payload);
+
+    // Try inserting into user_logins table
     const { data, error } = await supabase
       .from("user_logins")
       .upsert(payload, { onConflict: "id" });
 
     if (error) {
-      console.warn("Supabase user_logins table note:", error.message);
+      console.warn("Note when saving to 'user_logins' table:", error.message);
       // Fallback: try profiles table if user_logins isn't created
-      await supabase.from("profiles").upsert({
+      const { error: profErr } = await supabase.from("profiles").upsert({
         id: payload.id,
         email: payload.email,
         full_name: payload.full_name,
         updated_at: new Date().toISOString(),
-      }).catch(() => {});
+      });
+      if (profErr) {
+        console.warn("Note when saving to 'profiles' table:", profErr.message);
+        console.info("💡 TIP: Create the 'user_logins' table in Supabase SQL Editor to see records in Table Editor!");
+      }
+    } else {
+      console.log("Successfully saved user session to Supabase database table!");
     }
     return data;
   } catch (err) {
