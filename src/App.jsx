@@ -7,6 +7,7 @@ import Canvas2D from './components/Canvas2D';
 import RightPanel, { FurniturePropertiesPanel } from './components/RightPanel';
 import BottomPanel from './components/BottomPanel';
 import LoginPage from './components/LoginPage';
+import Dashboard from './components/Dashboard';
 
 const ThreeDViewer      = React.lazy(() => import('./components/ThreeDViewer'));
 const WalkthroughViewer = React.lazy(() => import('./components/WalkthroughViewer'));
@@ -33,6 +34,9 @@ export default function App() {
   const { viewMode, showRightPanel, setShowRightPanel } = useDesignStore();
   const is2D = viewMode === '2d';
 
+  // Navigation view state: 'dashboard' | 'studio'
+  const [currentView, setCurrentView] = useState('dashboard');
+
   // Auth state: check localStorage or default to null (show login page at start)
   const [user, setUser] = useState(() => {
     try {
@@ -45,6 +49,7 @@ export default function App() {
 
   const handleLoginSuccess = (userObj) => {
     setUser(userObj);
+    setCurrentView('dashboard');
     try {
       localStorage.setItem('blueprint_studio_user', JSON.stringify(userObj));
     } catch (err) {
@@ -54,6 +59,7 @@ export default function App() {
 
   const handleSignOut = () => {
     setUser(null);
+    setCurrentView('dashboard');
     try {
       localStorage.removeItem('blueprint_studio_user');
     } catch (err) {
@@ -99,15 +105,31 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Show login page at start if no user is signed in or entered as guest
+  // 1. Show login page if no user is authenticated
   if (!user) {
     return <LoginPage onLoginSuccess={handleLoginSuccess} />;
   }
 
+  // 2. Show Dashboard page after login
+  if (currentView === 'dashboard') {
+    return (
+      <Dashboard
+        user={user}
+        onSignOut={handleSignOut}
+        onOpenStudio={() => setCurrentView('studio')}
+      />
+    );
+  }
+
+  // 3. Show ArchDesign Studio editor
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       {/* Header spans full width */}
-      <Header currentUser={user} onSignOut={handleSignOut} />
+      <Header
+        currentUser={user}
+        onSignOut={handleSignOut}
+        onBackToDashboard={() => setCurrentView('dashboard')}
+      />
 
       {/* Body row */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
@@ -165,4 +187,3 @@ export default function App() {
     </div>
   );
 }
-

@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useDesignStore } from '../store/designStore';
+import { saveUserProject } from '../lib/supabase';
 
 const VIEWS = [
   { id: '2d',          label: '2D Plan',    icon: '⊞' },
@@ -7,17 +8,33 @@ const VIEWS = [
   { id: 'walkthrough', label: 'Walkthrough', icon: '▶' },
 ];
 
-export default function Header({ currentUser, onSignOut }) {
-  const [showProfileCard, setShowProfileCard] = React.useState(false);
+export default function Header({ currentUser, onSignOut, onBackToDashboard }) {
+  const [showProfileCard, setShowProfileCard] = useState(false);
+  const [showExitModal, setShowExitModal] = useState(false);
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState(false);
+
   const {
-    viewMode, setViewMode,
-    showAIPanel, setShowAIPanel,
-    showRightPanel, toggleRightPanel,
-    snapToGrid, setSnapToGrid,
-    clearDesign, loadDemo,
+    currentProjectId,
+    projectName,
+    setProjectName,
+    getProjectSnapshot,
+    viewMode,
+    setViewMode,
+    showAIPanel,
+    setShowAIPanel,
+    showRightPanel,
+    toggleRightPanel,
+    snapToGrid,
+    setSnapToGrid,
+    clearDesign,
+    loadDemo,
     exportProjectJSON,
-    undo, redo, canUndo, canRedo,
-    rooms = [], floors = []
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    rooms = [],
+    floors = []
   } = useDesignStore();
 
   const userInitials = (currentUser?.full_name || currentUser?.email || 'U')
@@ -26,6 +43,43 @@ export default function Header({ currentUser, onSignOut }) {
     .join('')
     .substring(0, 2)
     .toUpperCase();
+
+  const userId = currentUser?.id || currentUser?.email || 'guest_user';
+
+  // Save project into Supabase & localStorage
+  const handleSaveProject = async () => {
+    try {
+      const snapshot = getProjectSnapshot();
+      await saveUserProject(userId, {
+        id: currentProjectId || `proj_${Date.now()}`,
+        name: projectName || "My Project",
+        data: snapshot,
+      });
+      setSaveSuccessMessage(true);
+      setTimeout(() => setSaveSuccessMessage(false), 3000);
+      return true;
+    } catch (err) {
+      console.error("Save error:", err);
+      alert("Could not save project: " + err.message);
+      return false;
+    }
+  };
+
+  // Exit to dashboard with save prompt
+  const handleExitClick = () => {
+    setShowExitModal(true);
+  };
+
+  const handleSaveAndExit = async () => {
+    await handleSaveProject();
+    setShowExitModal(false);
+    if (onBackToDashboard) onBackToDashboard();
+  };
+
+  const handleExitWithoutSave = () => {
+    setShowExitModal(false);
+    if (onBackToDashboard) onBackToDashboard();
+  };
 
   return (
     <header style={{
@@ -37,15 +91,53 @@ export default function Header({ currentUser, onSignOut }) {
       padding: '0 16px',
       flexShrink: 0,
       zIndex: 100,
-      gap: 0,
+      gap: 12,
       overflow: 'visible',
       position: 'relative',
     }}>
+      {/* Back to Dashboard Button */}
+      {onBackToDashboard && (
+        <button
+          onClick={handleExitClick}
+          className="btn btn-secondary"
+          style={{ gap: 6, fontSize: 12, padding: '5px 12px', fontWeight: 600 }}
+          title="Return to Dashboard"
+        >
+          <span>←</span>
+          <span>Dashboard</span>
+        </button>
+      )}
+
       {/* Logo */}
       <div className="header-logo">
         <div className="header-logo-icon">🏠</div>
         <span className="header-logo-name">ArchDesign</span>
         <span className="header-logo-badge">PRO</span>
+      </div>
+
+      <div className="header-divider" />
+
+      {/* Editable Project Name Input */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <input
+          type="text"
+          value={projectName || ''}
+          onChange={(e) => setProjectName(e.target.value)}
+          placeholder="Untitled Project"
+          style={{
+            background: 'var(--bg-tertiary)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-sm)',
+            color: 'var(--text-primary)',
+            fontSize: 13,
+            fontWeight: 600,
+            padding: '4px 10px',
+            width: 210,
+            outline: 'none',
+          }}
+          title="Click to rename project"
+        />
+        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>✏️</span>
       </div>
 
       <div className="header-divider" />
@@ -68,8 +160,52 @@ export default function Header({ currentUser, onSignOut }) {
       {/* Spacer */}
       <div style={{ flex: 1 }} />
 
+      {/* Save Success Toast */}
+      {saveSuccessMessage && (
+        <div style={{
+          background: 'rgba(34,197,94,0.15)',
+          border: '1px solid rgba(34,197,94,0.4)',
+          color: '#4ade80',
+          padding: '4px 12px',
+          borderRadius: 99,
+          fontSize: 12,
+          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          animation: 'fadeIn 0.2s ease',
+        }}>
+          <span>✓</span>
+          <span>Project Saved!</span>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="header-actions">
+        {/* Save Project Button */}
+        <button
+          className="btn btn-primary"
+          onClick={handleSaveProject}
+          title="Save project to database & dashboard"
+          style={{ gap: 6, fontSize: 12, padding: '5px 14px', fontWeight: 600 }}
+        >
+          <span>💾</span>
+          <span>Save Project</span>
+        </button>
+
+        {/* Save/Export File JSON */}
+        <button
+          className="btn btn-secondary"
+          onClick={exportProjectJSON}
+          title="Export Design as .json file"
+          style={{ gap: 6, fontSize: 12, padding: '5px 10px' }}
+        >
+          <span>📥</span>
+          <span>Export JSON</span>
+        </button>
+
+        <div className="header-divider" style={{ margin: '0 4px' }} />
+
         {/* Undo */}
         <button
           className="icon-btn"
@@ -100,19 +236,6 @@ export default function Header({ currentUser, onSignOut }) {
 
         <div className="header-divider" style={{ margin: '0 4px' }} />
 
-        {/* Save File */}
-        <button
-          className="btn btn-primary"
-          onClick={exportProjectJSON}
-          title="Save Design File (.json)"
-          style={{ gap: 6, fontSize: 12, padding: '5px 12px' }}
-        >
-          <span>💾</span>
-          <span>Save File</span>
-        </button>
-
-        <div className="header-divider" style={{ margin: '0 4px' }} />
-
         {/* Snap to grid */}
         <button
           className={`icon-btn ${snapToGrid ? 'active' : ''}`}
@@ -127,7 +250,7 @@ export default function Header({ currentUser, onSignOut }) {
           </svg>
         </button>
 
-        {/* Right panel */}
+        {/* Right panel toggle */}
         <button
           className={`icon-btn ${showRightPanel ? 'active' : ''}`}
           onClick={toggleRightPanel}
@@ -140,7 +263,7 @@ export default function Header({ currentUser, onSignOut }) {
           </svg>
         </button>
 
-        {/* AI Panel */}
+        {/* AI Copilot Panel */}
         <button
           className={`icon-btn ${showAIPanel ? 'active' : ''}`}
           onClick={() => setShowAIPanel(!showAIPanel)}
@@ -155,8 +278,8 @@ export default function Header({ currentUser, onSignOut }) {
 
         <div className="header-divider" style={{ margin: '0 4px' }} />
 
-        {/* Reset / Demo */}
-        <button className="icon-btn" onClick={loadDemo} title="Load Demo Project">
+        {/* Reset Demo */}
+        <button className="icon-btn" onClick={loadDemo} title="Load Demo Blueprint">
           <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5">
             <path d="M2 8a6 6 0 0 1 10-4.5L14 6"/>
             <path d="M14 2v4h-4"/>
@@ -171,6 +294,7 @@ export default function Header({ currentUser, onSignOut }) {
           </svg>
         </button>
 
+        {/* User profile */}
         {currentUser && (
           <>
             <div className="header-divider" style={{ margin: '0 4px' }} />
@@ -178,7 +302,7 @@ export default function Header({ currentUser, onSignOut }) {
               <button
                 onClick={() => setShowProfileCard(!showProfileCard)}
                 className="user-profile-trigger-btn"
-                title="View Profile & Settings"
+                title="View Profile & Dashboard"
               >
                 <div className="user-avatar-circle">
                   {currentUser.is_guest ? '👤' : userInitials}
@@ -213,7 +337,7 @@ export default function Header({ currentUser, onSignOut }) {
 
                   <div className="profile-card-stats">
                     <div className="profile-stat-item">
-                      <span className="stat-label">Total Rooms</span>
+                      <span className="stat-label">Rooms</span>
                       <span className="stat-val">{rooms.length}</span>
                     </div>
                     <div className="profile-stat-item">
@@ -227,6 +351,19 @@ export default function Header({ currentUser, onSignOut }) {
                   </div>
 
                   <div className="profile-card-divider" />
+
+                  {onBackToDashboard && (
+                    <button
+                      className="profile-card-logout-btn"
+                      style={{ marginBottom: 6, background: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}
+                      onClick={() => {
+                        setShowProfileCard(false);
+                        handleExitClick();
+                      }}
+                    >
+                      <span>📋 My Dashboard & Projects</span>
+                    </button>
+                  )}
 
                   <button
                     className="profile-card-logout-btn"
@@ -243,6 +380,73 @@ export default function Header({ currentUser, onSignOut }) {
           </>
         )}
       </div>
+
+      {/* ── EXIT / SAVE CONFIRMATION MODAL ── */}
+      {showExitModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.75)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 300,
+          padding: 20,
+        }}>
+          <div style={{
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border-heavy)',
+            borderRadius: 16,
+            padding: 28,
+            maxWidth: 420,
+            width: '100%',
+            textAlign: 'center',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
+          }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>💾</div>
+            <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px 0' }}>
+              Save Project Changes?
+            </h3>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 24px 0', lineHeight: 1.5 }}>
+              Do you want to save <b>"{projectName || 'My Project'}"</b> to your dashboard before exiting?
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button
+                className="btn btn-primary"
+                onClick={handleSaveAndExit}
+                style={{ padding: '10px', fontSize: 13, justifyContent: 'center', fontWeight: 600 }}
+              >
+                💾 Save & Exit to Dashboard
+              </button>
+
+              <button
+                className="btn btn-secondary"
+                onClick={handleExitWithoutSave}
+                style={{ padding: '9px', fontSize: 13, justifyContent: 'center' }}
+              >
+                Exit Without Saving
+              </button>
+
+              <button
+                onClick={() => setShowExitModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  padding: '6px',
+                  marginTop: 4,
+                }}
+              >
+                Cancel & Stay in Studio
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

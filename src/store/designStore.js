@@ -347,6 +347,10 @@ export const useDesignStore = create(
     canUndo: false,
     canRedo: false,
 
+    // Project Metadata
+    currentProjectId: null,
+    projectName: "Modern Architectural Blueprint",
+
     // Core state
     grounds: DEFAULT_GROUNDS,
     rooms: DEFAULT_ROOMS,
@@ -835,6 +839,99 @@ export const useDesignStore = create(
         console.error("Import error:", err);
         alert("Failed to import file: " + err.message);
         return false;
+      }
+    },
+
+    // Project Actions
+    setProjectName: (name) => set({ projectName: name }),
+
+    getProjectSnapshot: () => {
+      const s = get();
+      return {
+        projectName: s.projectName || "Untitled Project",
+        grounds: deepClone(s.grounds),
+        rooms: deepClone(s.rooms),
+        doors: deepClone(s.doors),
+        windows: deepClone(s.windows),
+        furniture: deepClone(s.furniture),
+        floors: deepClone(s.floors),
+        activeFloor: s.activeFloor,
+        theme: s.theme,
+        pbrMaterialTheme: deepClone(s.pbrMaterialTheme),
+        windowModes: deepClone(s.windowModes),
+        groundPreviewed3D: deepClone(s.groundPreviewed3D),
+        entrances: deepClone(s.entrances || []),
+      };
+    },
+
+    loadProjectData: (projectRecord) => {
+      saveHistory(get, set, true);
+      const data = projectRecord.data || projectRecord;
+      set({
+        currentProjectId: projectRecord.id || `proj_${Date.now()}`,
+        projectName: projectRecord.name || projectRecord.projectName || "Saved Project",
+        grounds: (data.grounds || []).map(normalizeGround),
+        rooms: data.rooms || [],
+        doors: data.doors || [],
+        windows: data.windows || [],
+        furniture: data.furniture || [],
+        floors: data.floors && data.floors.length > 0 ? data.floors : [{ id: 0, name: "Ground Floor", height: 0 }],
+        activeFloor: data.activeFloor ?? 0,
+        theme: data.theme || "modern",
+        pbrMaterialTheme: data.pbrMaterialTheme || {
+          wallTexture: "modern_paint",
+          floorTexture: "hardwood_parquet",
+          exteriorTexture: "siding_wood",
+        },
+        windowModes: data.windowModes || {},
+        groundPreviewed3D: data.groundPreviewed3D || {},
+        entrances: data.entrances || [],
+        selectedId: null,
+        viewMode: "2d",
+        activeTool: "select",
+      });
+    },
+
+    initNewProject: (options = {}) => {
+      saveHistory(get, set, true);
+      const newId = `proj_${Date.now()}`;
+      const name = options.name || "New Architectural Blueprint";
+      const withDemo = options.withDemo !== false;
+
+      if (withDemo) {
+        set({
+          currentProjectId: newId,
+          projectName: name,
+          grounds: DEFAULT_GROUNDS,
+          rooms: DEFAULT_ROOMS,
+          doors: DEFAULT_DOORS,
+          windows: DEFAULT_WINDOWS,
+          furniture: DEFAULT_FURNITURE,
+          aiSuggestions: AI_SUGGESTIONS,
+          floors: [{ id: 0, name: "Ground Floor", height: 0 }],
+          activeFloor: 0,
+          selectedId: null,
+          viewMode: "2d",
+          activeTool: "select",
+          groundPreviewed3D: {},
+        });
+      } else {
+        set({
+          currentProjectId: newId,
+          projectName: name,
+          grounds: [],
+          rooms: [],
+          doors: [],
+          windows: [],
+          furniture: [],
+          aiSuggestions: [],
+          floors: [{ id: 0, name: "Ground Floor", height: 0 }],
+          activeFloor: 0,
+          selectedId: null,
+          viewMode: "2d",
+          activeTool: "ground",
+          groundPreviewed3D: {},
+        });
       }
     },
 
