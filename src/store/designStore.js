@@ -498,9 +498,9 @@ export const useDesignStore = create(
         const newIndex = orderedFloors.length;
         const suffix =
           newIndex === 1 ? "1st"
-          : newIndex === 2 ? "2nd"
-          : newIndex === 3 ? "3rd"
-          : `${newIndex}th`;
+            : newIndex === 2 ? "2nd"
+              : newIndex === 3 ? "3rd"
+                : `${newIndex}th`;
         const newFloor = { id: newId, name: `${suffix} Floor`, height: newIndex * 300 };
 
         const baseFloorId = orderedFloors[0].id;

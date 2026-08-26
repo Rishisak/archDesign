@@ -689,11 +689,11 @@ export default function Canvas2D() {
             />
           </filter>
           <pattern id="tile-pattern" width="20" height="20" patternUnits="userSpaceOnUse">
-            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(0,0,0,0.05)" strokeWidth="0.8"/>
+            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(0,0,0,0.05)" strokeWidth="0.8" />
           </pattern>
           <pattern id="bath-tile-pattern" width="16" height="16" patternUnits="userSpaceOnUse">
-            <rect width="16" height="16" fill="#cbb7a1"/>
-            <path d="M 16 0 L 0 0 0 16" fill="none" stroke="rgba(0,0,0,0.12)" strokeWidth="1"/>
+            <rect width="16" height="16" fill="#cbb7a1" />
+            <path d="M 16 0 L 0 0 0 16" fill="none" stroke="rgba(0,0,0,0.12)" strokeWidth="1" />
           </pattern>
         </defs>
 
@@ -731,17 +731,19 @@ export default function Canvas2D() {
                   strokeWidth={isSel ? 3 / z : 1.5 / z}
                   strokeDasharray={`${8 / z} ${4 / z}`}
                 />
-                <text
-                  x={c.x}
-                  y={c.y}
-                  textAnchor="middle"
-                  fill="#166534"
-                  fontSize={Math.max(8, 11 / z)}
-                  fontFamily="Inter,sans-serif"
-                  fontWeight="700"
-                >
-                  Ground {gi + 1}
-                </text>
+                {z >= 0.4 && (
+                  <text
+                    x={c.x}
+                    y={c.y}
+                    textAnchor="middle"
+                    fill="#166534"
+                    fontSize={Math.max(8, 11 / z)}
+                    fontFamily="Inter,sans-serif"
+                    fontWeight="700"
+                  >
+                    Ground {gi + 1}
+                  </text>
+                )}
 
                 {isSel &&
                   activeTool === "select" &&
@@ -807,23 +809,25 @@ export default function Canvas2D() {
                     rx={2}
                   />
                   {/* Room label */}
-                  <text
-                    x={room.x + room.width / 2}
-                    y={room.y + room.height / 2}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fill="rgba(79,142,247,0.55)"
-                    fontSize={Math.max(7, 9 / z)}
-                    fontFamily="Inter,sans-serif"
-                    fontWeight="500"
-                  >
-                    {room.name}
-                  </text>
+                  {z >= 0.4 && (
+                    <text
+                      x={room.x + room.width / 2}
+                      y={room.y + room.height / 2}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fill="rgba(79,142,247,0.55)"
+                      fontSize={Math.max(7, 9 / z)}
+                      fontFamily="Inter,sans-serif"
+                      fontWeight="500"
+                    >
+                      {room.name}
+                    </text>
+                  )}
                 </g>
               ))}
 
               {/* Legend label */}
-              {ghostRooms.length > 0 && (() => {
+              {z >= 0.4 && ghostRooms.length > 0 && (() => {
                 const minX = Math.min(...ghostRooms.map((r) => r.x));
                 const minY = Math.min(...ghostRooms.map((r) => r.y));
                 return (
@@ -872,7 +876,7 @@ export default function Canvas2D() {
                 />
               ))}
 
-              {groundDraftPoints.slice(1).map((p, i) => {
+              {z >= 0.35 && groundDraftPoints.slice(1).map((p, i) => {
                 const a = groundDraftPoints[i];
                 const len = toMeters(segmentLength(a, p));
                 const mx = (a.x + p.x) / 2;
@@ -908,7 +912,7 @@ export default function Canvas2D() {
           )}
 
           {/* ── AutoCAD Outer Dimension Lines (14.20 m × 11.60 m) ── */}
-          {visRooms.length > 0 && (
+          {visRooms.length > 0 && z >= 0.4 && (
             <g pointerEvents="none">
               {/* TOP DIMENSION LINE (14.20 m) */}
               <line x1={100} y1={30} x2={1120} y2={30} stroke={themeColors.outerDimLine} strokeWidth={1.2 / z} />
@@ -1003,35 +1007,39 @@ export default function Canvas2D() {
                   height={room.height}
                   fill="none"
                   stroke={sel ? "#4f8ef7" : themeColors.wallFill}
-                  strokeWidth={sel ? Math.max(3 / z, 14 / z) : 16 / z}
+                  strokeWidth={sel ? Math.max(2 / z, 10) : Math.max(1.5 / z, 8)}
                 />
 
                 {/* AutoCAD Room Labels (Title + Dimensions String) */}
-                <text
-                  x={room.x + room.width / 2}
-                  y={room.y + room.height / 2 - 6}
-                  textAnchor="middle"
-                  fill={themeColors.roomTitleText}
-                  fontSize={Math.max(7, 13 / z)}
-                  fontWeight="700"
-                  fontFamily="'Space Grotesk', Inter, sans-serif"
-                  letterSpacing="0.04em"
-                  pointerEvents="none"
-                >
-                  {room.name.toUpperCase()}
-                </text>
-                <text
-                  x={room.x + room.width / 2}
-                  y={room.y + room.height / 2 + 10}
-                  textAnchor="middle"
-                  fill={themeColors.roomDimText}
-                  fontSize={Math.max(6, 10 / z)}
-                  fontFamily="Inter, sans-serif"
-                  fontWeight="500"
-                  pointerEvents="none"
-                >
-                  {(room.width / 100).toFixed(1)}m × {(room.height / 100).toFixed(1)}m
-                </text>
+                {z >= 0.4 && (
+                  <text
+                    x={room.x + room.width / 2}
+                    y={room.y + room.height / 2 - 6}
+                    textAnchor="middle"
+                    fill={themeColors.roomTitleText}
+                    fontSize={Math.max(7, 13 / z)}
+                    fontWeight="700"
+                    fontFamily="'Space Grotesk', Inter, sans-serif"
+                    letterSpacing="0.04em"
+                    pointerEvents="none"
+                  >
+                    {room.name.toUpperCase()}
+                  </text>
+                )}
+                {z >= 0.4 && (
+                  <text
+                    x={room.x + room.width / 2}
+                    y={room.y + room.height / 2 + 10}
+                    textAnchor="middle"
+                    fill={themeColors.roomDimText}
+                    fontSize={Math.max(6, 10 / z)}
+                    fontFamily="Inter, sans-serif"
+                    fontWeight="500"
+                    pointerEvents="none"
+                  >
+                    {(room.width / 100).toFixed(1)}m × {(room.height / 100).toFixed(1)}m
+                  </text>
+                )}
 
                 {/* Dimension lines */}
                 {sel && (
@@ -1436,18 +1444,20 @@ export default function Canvas2D() {
                 strokeDasharray={`${6 / z} ${3 / z}`}
                 rx={2}
               />
-              <text
-                x={preview.x + preview.width / 2}
-                y={preview.y - 8 / z}
-                textAnchor="middle"
-                fill="#4f8ef7"
-                fontSize={Math.max(8, 12 / z)}
-                fontFamily="Inter"
-                fontWeight="600"
-              >
-                {(preview.width / 100).toFixed(1)}m ×{" "}
-                {(preview.height / 100).toFixed(1)}m
-              </text>
+              {z >= 0.5 && (
+                <text
+                  x={preview.x + preview.width / 2}
+                  y={preview.y - 8 / z}
+                  textAnchor="middle"
+                  fill="#4f8ef7"
+                  fontSize={Math.max(8, 12 / z)}
+                  fontFamily="Inter"
+                  fontWeight="600"
+                >
+                  {(preview.width / 100).toFixed(1)}m ×{" "}
+                  {(preview.height / 100).toFixed(1)}m
+                </text>
+              )}
             </g>
           )}
 
@@ -1888,7 +1898,7 @@ function Furniture2D({ item, selected, z, themeColors, onClick, onMouseDown }) {
             {/* Center Handrail & UP Arrow */}
             <line x1={cx} y1={y + h * 0.85} x2={cx} y2={y + h * 0.15} stroke={fStroke} strokeWidth={1.5 / z} />
             <path d={`M ${cx - 8} ${y + h * 0.3} L ${cx} ${y + h * 0.15} L ${cx + 8} ${y + h * 0.3}`} fill="none" stroke={fStroke} strokeWidth={1.8 / z} />
-            <text x={cx} y={y + h * 0.95} textAnchor="middle" fill={fText} fontSize={Math.max(6, 9 / z)} fontWeight="700" fontFamily="Inter">UP ↑</text>
+            {z >= 0.35 && <text x={cx} y={y + h * 0.95} textAnchor="middle" fill={fText} fontSize={Math.max(6, 9 / z)} fontWeight="700" fontFamily="Inter">UP ↑</text>}
           </g>
         );
 
@@ -2020,7 +2030,7 @@ function Furniture2D({ item, selected, z, themeColors, onClick, onMouseDown }) {
         />
       )}
       {renderDetails()}
-      {label && type !== "plant" && (
+      {label && type !== "plant" && z >= 0.35 && (
         <text
           x={cx}
           y={cy + 3}

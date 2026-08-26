@@ -380,8 +380,8 @@ function RoomContents({ room, cx, cz, rw, rd }) {
 }
 
 // ── Window mesh (transparent glass + frame + interactive sliding/casement sashes) ──
-function WindowMesh({ win, pos, size, isOpen, mode = "sliding", onToggle }) {
-  const [fw, fh, fd] = size;
+function WindowMesh({ win, info, isOpen, mode = "sliding", onToggle }) {
+  const { pos, rotY, ww: fw, wh: fh, wd: fd } = info;
   const slideRef = useRef();
   const tiltRef = useRef();
 
@@ -407,26 +407,54 @@ function WindowMesh({ win, pos, size, isOpen, mode = "sliding", onToggle }) {
     }
   });
 
+  const frameT = 0.035;
+
   return (
     <group
       position={pos}
+      rotation={[0, rotY, 0]}
       onClick={(e) => {
         e.stopPropagation();
         if (onToggle && win) onToggle(win.id);
       }}
     >
-      {/* Outer frame */}
-      <mesh castShadow receiveShadow>
-        <boxGeometry args={[fw + 0.02, fh + 0.02, fd * 1.1]} />
+      {/* Outer frame profile (hollow) */}
+      <mesh position={[0, fh / 2 - frameT / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[fw + frameT * 2, frameT, fd * 1.15]} />
         <meshStandardMaterial
           color={isOpen ? "#0284c7" : "#869ab0"}
           roughness={0.3}
           metalness={0.4}
         />
       </mesh>
+      <mesh position={[0, -fh / 2 + frameT / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[fw + frameT * 2, frameT, fd * 1.15]} />
+        <meshStandardMaterial
+          color={isOpen ? "#0284c7" : "#869ab0"}
+          roughness={0.3}
+          metalness={0.4}
+        />
+      </mesh>
+      <mesh position={[-fw / 2 - frameT / 2, 0, 0]} castShadow receiveShadow>
+        <boxGeometry args={[frameT, fh, fd * 1.15]} />
+        <meshStandardMaterial
+          color={isOpen ? "#0284c7" : "#869ab0"}
+          roughness={0.3}
+          metalness={0.4}
+        />
+      </mesh>
+      <mesh position={[fw / 2 + frameT / 2, 0, 0]} castShadow receiveShadow>
+        <boxGeometry args={[frameT, fh, fd * 1.15]} />
+        <meshStandardMaterial
+          color={isOpen ? "#0284c7" : "#869ab0"}
+          roughness={0.3}
+          metalness={0.4}
+        />
+      </mesh>
+
       {/* Fixed Glass Pane - Left */}
-      <mesh position={[-fw * 0.22, 0, 0]}>
-        <boxGeometry args={[fw * 0.48, fh * 0.85, fd * 0.3]} />
+      <mesh position={[-fw * 0.24, 0, 0]}>
+        <boxGeometry args={[fw * 0.48, fh - frameT * 2, fd * 0.2]} />
         <meshStandardMaterial
           color="#a8d0e8"
           roughness={0.05}
@@ -438,8 +466,8 @@ function WindowMesh({ win, pos, size, isOpen, mode = "sliding", onToggle }) {
       {/* Active Glass Pane (Sliding or Casement) */}
       {mode === "casement" ? (
         <group position={[fw * 0.46, 0, 0]} ref={tiltRef}>
-          <mesh position={[-fw * 0.24, 0, fd * 0.15]}>
-            <boxGeometry args={[fw * 0.48, fh * 0.85, fd * 0.3]} />
+          <mesh position={[-fw * 0.24, 0, fd * 0.1]}>
+            <boxGeometry args={[fw * 0.48, fh - frameT * 2, fd * 0.2]} />
             <meshStandardMaterial
               color={isOpen ? "#86efac" : "#a8d0e8"}
               roughness={0.05}
@@ -450,8 +478,8 @@ function WindowMesh({ win, pos, size, isOpen, mode = "sliding", onToggle }) {
           </mesh>
         </group>
       ) : (
-        <mesh position={[fw * 0.22, 0, fd * 0.15]} ref={slideRef}>
-          <boxGeometry args={[fw * 0.48, fh * 0.85, fd * 0.3]} />
+        <mesh position={[fw * 0.24, 0, fd * 0.1]} ref={slideRef}>
+          <boxGeometry args={[fw * 0.48, fh - frameT * 2, fd * 0.2]} />
           <meshStandardMaterial
             color={isOpen ? "#86efac" : "#a8d0e8"}
             roughness={0.05}
@@ -465,25 +493,28 @@ function WindowMesh({ win, pos, size, isOpen, mode = "sliding", onToggle }) {
   );
 }
 
-// ── Door mesh (interactive swing opening with single-pivot 90° frame lerp) ──
-function DoorMesh({ door, pos, size, isOpen, onToggle }) {
-  const [dw, dh, dd] = size;
+// ── Door mesh (interactive swing opening with hollow frame so room elements are visible) ──
+function DoorMesh({ door, info, isOpen, onToggle }) {
+  const { pos, rotY, dw, dh, dd } = info;
+  const isDouble = door.type === "door_double";
   const [hovered, setHovered] = useState(false);
-  const isH = door.wall === "top" || door.wall === "bottom";
-  const targetAngle = isOpen ? (isH ? -Math.PI / 2 : Math.PI / 2) : 0;
-  const hingeRef = useRef();
+  const targetAngle = isOpen ? -Math.PI / 2 : 0;
+  const leftHingeRef = useRef();
+  const rightHingeRef = useRef();
   const angleRef = useRef(0);
 
   useFrame((_, delta) => {
-    if (hingeRef.current) {
-      // Spring-like smooth damp: fast start, gentle ease-out
-      angleRef.current = THREE.MathUtils.damp(
-        angleRef.current,
-        targetAngle,
-        8,
-        delta,
-      );
-      hingeRef.current.rotation.y = angleRef.current;
+    angleRef.current = THREE.MathUtils.damp(
+      angleRef.current,
+      targetAngle,
+      8,
+      delta,
+    );
+    if (leftHingeRef.current) {
+      leftHingeRef.current.rotation.y = angleRef.current;
+    }
+    if (rightHingeRef.current) {
+      rightHingeRef.current.rotation.y = -angleRef.current;
     }
   });
 
@@ -507,7 +538,7 @@ function DoorMesh({ door, pos, size, isOpen, onToggle }) {
     document.body.style.cursor = "auto";
   }, []);
 
-  // Emissive colours for feedback
+  const frameT = 0.04; // 4cm frame trim thickness
   const frameEmissive = hovered ? "#4a3010" : "#000000";
   const leafColor = isOpen ? "#e8c890" : hovered ? "#9a7c54" : "#7a5c3a";
   const leafEmissive = isOpen
@@ -522,60 +553,128 @@ function DoorMesh({ door, pos, size, isOpen, onToggle }) {
   return (
     <group
       position={pos}
+      rotation={[0, rotY, 0]}
       onClick={handleClick}
       onPointerOver={handlePointerOver}
       onPointerOut={handlePointerOut}
     >
-      {/* Door Frame */}
-      <mesh castShadow receiveShadow>
-        <boxGeometry args={[dw + 0.03, dh + 0.03, dd * 1.05]} />
+      {/* ── Hollow Door Frame (Top Header + Left Jamb + Right Jamb) ── */}
+      {/* Top Header */}
+      <mesh position={[0, dh / 2 - frameT / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[dw + frameT * 2, frameT, dd * 1.15]} />
         <meshStandardMaterial
-          color="#6b4c2a"
+          color="#5a3d1e"
           emissive={frameEmissive}
           emissiveIntensity={1}
           roughness={0.7}
-          polygonOffset
-          polygonOffsetFactor={0.5}
-          polygonOffsetUnits={0.5}
+        />
+      </mesh>
+      {/* Left Jamb */}
+      <mesh position={[-dw / 2 - frameT / 2, 0, 0]} castShadow receiveShadow>
+        <boxGeometry args={[frameT, dh, dd * 1.15]} />
+        <meshStandardMaterial
+          color="#5a3d1e"
+          emissive={frameEmissive}
+          emissiveIntensity={1}
+          roughness={0.7}
+        />
+      </mesh>
+      {/* Right Jamb */}
+      <mesh position={[dw / 2 + frameT / 2, 0, 0]} castShadow receiveShadow>
+        <boxGeometry args={[frameT, dh, dd * 1.15]} />
+        <meshStandardMaterial
+          color="#5a3d1e"
+          emissive={frameEmissive}
+          emissiveIntensity={1}
+          roughness={0.7}
         />
       </mesh>
 
-      {/* Single Hinge Pivot Group at Frame Corner */}
-      <group position={[-dw / 2, 0, 0]} ref={hingeRef}>
-        {/* Door Leaf */}
-        <mesh position={[dw / 2, 0, 0]} castShadow receiveShadow>
-          <boxGeometry args={[dw * 0.96, dh * 0.96, dd * 0.65]} />
-          <meshStandardMaterial
-            color={leafColor}
-            emissive={leafEmissive}
-            emissiveIntensity={1}
-            roughness={0.65}
-            polygonOffset
-            polygonOffsetFactor={0.2}
-            polygonOffsetUnits={0.2}
-          />
-        </mesh>
-        {/* Brass Knob */}
-        <mesh position={[dw * 0.85, 0, dd * 0.55]} castShadow>
-          <sphereGeometry args={[0.045, 10, 10]} />
-          <meshStandardMaterial
-            color="#c8a840"
-            emissive={knobEmissive}
-            emissiveIntensity={1}
-            roughness={0.15}
-            metalness={0.9}
-          />
-        </mesh>
-        {/* Knob back plate */}
-        <mesh position={[dw * 0.85, 0, -dd * 0.55]} castShadow>
-          <sphereGeometry args={[0.04, 10, 10]} />
-          <meshStandardMaterial
-            color="#c8a840"
-            roughness={0.15}
-            metalness={0.9}
-          />
-        </mesh>
-      </group>
+      {/* ── Door Leaf / Leaves ── */}
+      {isDouble ? (
+        <>
+          {/* Left Leaf */}
+          <group position={[-dw / 2, 0, 0]} ref={leftHingeRef}>
+            <mesh position={[dw / 4, 0, 0]} castShadow receiveShadow>
+              <boxGeometry args={[dw / 2 - 0.01, dh - frameT - 0.02, dd * 0.35]} />
+              <meshStandardMaterial
+                color={leafColor}
+                emissive={leafEmissive}
+                emissiveIntensity={1}
+                roughness={0.65}
+              />
+            </mesh>
+            {/* Brass Knob Left */}
+            <mesh position={[dw / 2 - 0.06, 0, dd * 0.24]} castShadow>
+              <sphereGeometry args={[0.035, 10, 10]} />
+              <meshStandardMaterial
+                color="#c8a840"
+                emissive={knobEmissive}
+                emissiveIntensity={1}
+                roughness={0.15}
+                metalness={0.9}
+              />
+            </mesh>
+          </group>
+
+          {/* Right Leaf */}
+          <group position={[dw / 2, 0, 0]} ref={rightHingeRef}>
+            <mesh position={[-dw / 4, 0, 0]} castShadow receiveShadow>
+              <boxGeometry args={[dw / 2 - 0.01, dh - frameT - 0.02, dd * 0.35]} />
+              <meshStandardMaterial
+                color={leafColor}
+                emissive={leafEmissive}
+                emissiveIntensity={1}
+                roughness={0.65}
+              />
+            </mesh>
+            {/* Brass Knob Right */}
+            <mesh position={[-dw / 2 + 0.06, 0, dd * 0.24]} castShadow>
+              <sphereGeometry args={[0.035, 10, 10]} />
+              <meshStandardMaterial
+                color="#c8a840"
+                emissive={knobEmissive}
+                emissiveIntensity={1}
+                roughness={0.15}
+                metalness={0.9}
+              />
+            </mesh>
+          </group>
+        </>
+      ) : (
+        /* Single Leaf */
+        <group position={[-dw / 2, 0, 0]} ref={leftHingeRef}>
+          <mesh position={[dw / 2, 0, 0]} castShadow receiveShadow>
+            <boxGeometry args={[dw - 0.01, dh - frameT - 0.02, dd * 0.35]} />
+            <meshStandardMaterial
+              color={leafColor}
+              emissive={leafEmissive}
+              emissiveIntensity={1}
+              roughness={0.65}
+            />
+          </mesh>
+          {/* Brass Knob */}
+          <mesh position={[dw - 0.08, 0, dd * 0.24]} castShadow>
+            <sphereGeometry args={[0.04, 10, 10]} />
+            <meshStandardMaterial
+              color="#c8a840"
+              emissive={knobEmissive}
+              emissiveIntensity={1}
+              roughness={0.15}
+              metalness={0.9}
+            />
+          </mesh>
+          {/* Knob back plate */}
+          <mesh position={[dw - 0.08, 0, -dd * 0.24]} castShadow>
+            <sphereGeometry args={[0.035, 10, 10]} />
+            <meshStandardMaterial
+              color="#c8a840"
+              roughness={0.15}
+              metalness={0.9}
+            />
+          </mesh>
+        </group>
+      )}
     </group>
   );
 }
@@ -915,8 +1014,9 @@ function renderFurnitureMesh(type, w, d, color, label) {
 // ── Individual room ───────────────────────────────────────────
 function Room({
   room,
-  allDoors,
-  allWindows,
+  allRooms = [],
+  allDoors = [],
+  allWindows = [],
   openDoors,
   openWindows,
   windowModes = {},
@@ -948,8 +1048,8 @@ function Room({
         <meshStandardMaterial color="#a08060" roughness={0.6} wireframe />
       </mesh>
 
-      {/* ── Walls ── */}
-      {buildWallSegments(cx, cz, rw, rd, "north", doors, windows).map(
+      {/* ── Walls (openings carved for all doors/windows on shared & outer walls) ── */}
+      {buildWallSegments(cx, cz, rw, rd, "north", room, allRooms, allDoors, allWindows).map(
         (seg, i) => (
           <mesh key={`n${i}`} position={seg.pos} castShadow receiveShadow>
             <boxGeometry args={seg.size} />
@@ -957,7 +1057,7 @@ function Room({
           </mesh>
         ),
       )}
-      {buildWallSegments(cx, cz, rw, rd, "south", doors, windows).map(
+      {buildWallSegments(cx, cz, rw, rd, "south", room, allRooms, allDoors, allWindows).map(
         (seg, i) => (
           <mesh key={`s${i}`} position={seg.pos} castShadow receiveShadow>
             <boxGeometry args={seg.size} />
@@ -965,7 +1065,7 @@ function Room({
           </mesh>
         ),
       )}
-      {buildWallSegments(cx, cz, rw, rd, "west", doors, windows).map(
+      {buildWallSegments(cx, cz, rw, rd, "west", room, allRooms, allDoors, allWindows).map(
         (seg, i) => (
           <mesh key={`w${i}`} position={seg.pos} castShadow receiveShadow>
             <boxGeometry args={seg.size} />
@@ -973,7 +1073,7 @@ function Room({
           </mesh>
         ),
       )}
-      {buildWallSegments(cx, cz, rw, rd, "east", doors, windows).map(
+      {buildWallSegments(cx, cz, rw, rd, "east", room, allRooms, allDoors, allWindows).map(
         (seg, i) => (
           <mesh key={`e${i}`} position={seg.pos} castShadow receiveShadow>
             <boxGeometry args={seg.size} />
@@ -984,14 +1084,13 @@ function Room({
 
       {/* ── Door meshes ── */}
       {doors.map((door, i) => {
-        const info = getDoorPos(x, z, rw, rd, door);
+        const info = getDoorInfo(x, z, rw, rd, door);
         const isOpen = openDoors.has(door.id);
         return (
           <DoorMesh
             key={door.id || i}
             door={door}
-            pos={info.pos}
-            size={info.size}
+            info={info}
             isOpen={isOpen}
             onToggle={toggleDoor}
           />
@@ -1000,15 +1099,14 @@ function Room({
 
       {/* ── Window meshes ── */}
       {windows.map((win, i) => {
-        const info = getWindowPos(x, z, rw, rd, win);
+        const info = getWindowInfo(x, z, rw, rd, win);
         const isOpen = openWindows.has(win.id);
         const mode = windowModes[win.id] || "sliding";
         return (
           <WindowMesh
             key={win.id || i}
             win={win}
-            pos={info.pos}
-            size={info.size}
+            info={info}
             isOpen={isOpen}
             mode={mode}
             onToggle={toggleWindow}
@@ -1037,58 +1135,129 @@ function Room({
 // ── Geometry helpers for wall segments ───────────────────────
 // Carves real openings (doors & windows) into each wall side by splitting
 // the wall into left/right flanking panels plus a transom above the gap.
-function buildWallSegments(cx, cz, rw, rd, side, doors, windows) {
+// Searches all doors & windows on the floor that lie on or adjacent to this wall.
+function buildWallSegments(cx, cz, rw, rd, side, currentRoom, allRooms, allDoors, allWindows) {
   const h = WALL_H;
   const t = WALL_T;
   const segs = [];
 
-  // Map door-wall names → which axis the opening lives on
-  // "top"/"bottom" walls run along X; "left"/"right" walls run along Z
-  const wallMap = {
-    north: "top",
-    south: "bottom",
-    west: "left",
-    east: "right",
-  };
-  const wallKey = wallMap[side];
-
-  // Collect all openings on this wall (doors + windows)
-  const wallDoors = doors.filter((d) => d.wall === wallKey);
-  const wallWindows = windows.filter((w) => w.wall === wallKey);
-
-  // Build a sorted list of openings: { start, end, floorY, ceilY }
-  // where start/end are in LOCAL wall-length coordinates (0 → wallLength)
   const wallLen = side === "north" || side === "south" ? rw : rd;
+  const rx1 = currentRoom.x * SC;
+  const rz1 = currentRoom.y * SC;
+  const rx2 = rx1 + rw;
+  const rz2 = rz1 + rd;
+
+  const wallIsH = side === "north" || side === "south";
+  const wallCoord = side === "north" ? rz1 : side === "south" ? rz2 : side === "west" ? rx1 : rx2;
 
   const openings = [];
 
-  wallDoors.forEach((d) => {
-    const dw = d.width * SC;
-    const center = d.position * wallLen; // position is 0–1 fraction
-    openings.push({
-      start: center - dw / 2,
-      end: center + dw / 2,
-      floorY: 0,
-      ceilY: 2.2, // full-height door opening
-    });
+  // 1. Process all doors on the floor that intersect this wall
+  allDoors.forEach((d) => {
+    const parent = allRooms.find((r) => r.id === d.roomId);
+    if (!parent) return;
+
+    const px1 = parent.x * SC;
+    const pz1 = parent.y * SC;
+    const pw = parent.width * SC;
+    const pd = parent.height * SC;
+    const dw = (d.width || 90) * SC;
+    const pos = d.position ?? 0.5;
+
+    const isDoorH = d.wall === "top" || d.wall === "bottom";
+
+    if (wallIsH && isDoorH) {
+      const doorZ = d.wall === "top" ? pz1 : pz1 + pd;
+      if (Math.abs(doorZ - wallCoord) <= t * 1.5) {
+        const center = px1 + pw * pos;
+        const d_start = center - dw / 2;
+        const d_end = center + dw / 2;
+        const ovStart = Math.max(rx1, d_start);
+        const ovEnd = Math.min(rx2, d_end);
+        if (ovEnd - ovStart > 0.05) {
+          openings.push({
+            start: ovStart - rx1,
+            end: ovEnd - rx1,
+            floorY: 0,
+            ceilY: 2.2,
+          });
+        }
+      }
+    } else if (!wallIsH && !isDoorH) {
+      const doorX = d.wall === "left" ? px1 : px1 + pw;
+      if (Math.abs(doorX - wallCoord) <= t * 1.5) {
+        const center = pz1 + pd * pos;
+        const d_start = center - dw / 2;
+        const d_end = center + dw / 2;
+        const ovStart = Math.max(rz1, d_start);
+        const ovEnd = Math.min(rz2, d_end);
+        if (ovEnd - ovStart > 0.05) {
+          openings.push({
+            start: ovStart - rz1,
+            end: ovEnd - rz1,
+            floorY: 0,
+            ceilY: 2.2,
+          });
+        }
+      }
+    }
   });
 
-  wallWindows.forEach((w) => {
-    const ww = w.width * SC;
-    const center = w.position * wallLen;
-    openings.push({
-      start: center - ww / 2,
-      end: center + ww / 2,
-      floorY: 1.1, // sill height
-      ceilY: 1.1 + 1.1, // sill + 1.1 m height
-    });
+  // 2. Process all windows on the floor that intersect this wall
+  allWindows.forEach((w) => {
+    const parent = allRooms.find((r) => r.id === w.roomId);
+    if (!parent) return;
+
+    const px1 = parent.x * SC;
+    const pz1 = parent.y * SC;
+    const pw = parent.width * SC;
+    const pd = parent.height * SC;
+    const ww = (w.width || 120) * SC;
+    const pos = w.position ?? 0.5;
+
+    const isWinH = w.wall === "top" || w.wall === "bottom";
+
+    if (wallIsH && isWinH) {
+      const winZ = w.wall === "top" ? pz1 : pz1 + pd;
+      if (Math.abs(winZ - wallCoord) <= t * 1.5) {
+        const center = px1 + pw * pos;
+        const w_start = center - ww / 2;
+        const w_end = center + ww / 2;
+        const ovStart = Math.max(rx1, w_start);
+        const ovEnd = Math.min(rx2, w_end);
+        if (ovEnd - ovStart > 0.05) {
+          openings.push({
+            start: ovStart - rx1,
+            end: ovEnd - rx1,
+            floorY: 1.1,
+            ceilY: 2.2,
+          });
+        }
+      }
+    } else if (!wallIsH && !isWinH) {
+      const winX = w.wall === "left" ? px1 : px1 + pw;
+      if (Math.abs(winX - wallCoord) <= t * 1.5) {
+        const center = pz1 + pd * pos;
+        const w_start = center - ww / 2;
+        const w_end = center + ww / 2;
+        const ovStart = Math.max(rz1, w_start);
+        const ovEnd = Math.min(rz2, w_end);
+        if (ovEnd - ovStart > 0.05) {
+          openings.push({
+            start: ovStart - rz1,
+            end: ovEnd - rz1,
+            floorY: 1.1,
+            ceilY: 2.2,
+          });
+        }
+      }
+    }
   });
 
   // Sort openings left-to-right along the wall
   openings.sort((a, b) => a.start - b.start);
 
   if (openings.length === 0) {
-    // No openings – full solid wall
     if (side === "north")
       segs.push({ pos: [cx, h / 2, cz - rd / 2 + t / 2], size: [rw, h, t] });
     if (side === "south")
@@ -1101,7 +1270,6 @@ function buildWallSegments(cx, cz, rw, rd, side, doors, windows) {
   }
 
   // Helper to add a wall slab
-  // For north/south walls the "long" axis is X, for east/west it is Z.
   const addSlab = (localStart, localEnd, yBot, yTop) => {
     const segLen = localEnd - localStart;
     if (segLen <= 0.001) return;
@@ -1158,63 +1326,75 @@ function buildWallSegments(cx, cz, rw, rd, side, doors, windows) {
   return segs;
 }
 
-function getDoorPos(x, z, rw, rd, door) {
-  const dw = door.width * SC;
+function getDoorInfo(x, z, rw, rd, door) {
+  const dw = (door.width || 90) * SC;
   const dh = 2.2;
   const t = WALL_T;
-  const p = door.position;
+  const p = door.position ?? 0.5;
+
+  let pos = [0, 0, 0];
+  let rotY = 0;
 
   switch (door.wall) {
     case "top":
-      return { pos: [x + rw * p, dh / 2, z + t / 2], size: [dw, dh, t * 1.1] };
+      pos = [x + rw * p, dh / 2, z + t / 2];
+      rotY = 0;
+      break;
     case "bottom":
-      return {
-        pos: [x + rw * p, dh / 2, z + rd - t / 2],
-        size: [dw, dh, t * 1.1],
-      };
+      pos = [x + rw * p, dh / 2, z + rd - t / 2];
+      rotY = 0;
+      break;
     case "left":
-      return { pos: [x + t / 2, dh / 2, z + rd * p], size: [t * 1.1, dh, dw] };
+      pos = [x + t / 2, dh / 2, z + rd * p];
+      rotY = Math.PI / 2;
+      break;
     case "right":
-      return {
-        pos: [x + rw - t / 2, dh / 2, z + rd * p],
-        size: [t * 1.1, dh, dw],
-      };
+      pos = [x + rw - t / 2, dh / 2, z + rd * p];
+      rotY = Math.PI / 2;
+      break;
     default:
-      return { pos: [0, 0, 0], size: [0.01, 0.01, 0.01] };
+      pos = [0, 0, 0];
+      rotY = 0;
+      break;
   }
+
+  return { pos, rotY, dw, dh, dd: t };
 }
 
-function getWindowPos(x, z, rw, rd, win) {
-  const ww = win.width * SC;
+function getWindowInfo(x, z, rw, rd, win) {
+  const ww = (win.width || 120) * SC;
   const wh = 1.1;
   const wy = 1.1;
   const t = WALL_T;
-  const p = win.position;
+  const p = win.position ?? 0.5;
+
+  let pos = [0, 0, 0];
+  let rotY = 0;
 
   switch (win.wall) {
     case "top":
-      return {
-        pos: [x + rw * p, wy + wh / 2, z + t / 2],
-        size: [ww, wh, t * 1.2],
-      };
+      pos = [x + rw * p, wy + wh / 2, z + t / 2];
+      rotY = 0;
+      break;
     case "bottom":
-      return {
-        pos: [x + rw * p, wy + wh / 2, z + rd - t / 2],
-        size: [ww, wh, t * 1.2],
-      };
+      pos = [x + rw * p, wy + wh / 2, z + rd - t / 2];
+      rotY = 0;
+      break;
     case "left":
-      return {
-        pos: [x + t / 2, wy + wh / 2, z + rd * p],
-        size: [t * 1.2, wh, ww],
-      };
+      pos = [x + t / 2, wy + wh / 2, z + rd * p];
+      rotY = Math.PI / 2;
+      break;
     case "right":
-      return {
-        pos: [x + rw - t / 2, wy + wh / 2, z + rd * p],
-        size: [t * 1.2, wh, ww],
-      };
+      pos = [x + rw - t / 2, wy + wh / 2, z + rd * p];
+      rotY = Math.PI / 2;
+      break;
     default:
-      return { pos: [0, 0, 0], size: [0.01, 0.01, 0.01] };
+      pos = [0, 0, 0];
+      rotY = 0;
+      break;
   }
+
+  return { pos, rotY, ww, wh, wd: t };
 }
 
 // ── Per-storey vertical offset: wall height + inter-floor slab ──────────────
@@ -1375,6 +1555,7 @@ function Scene({ showRoof, timeOfDay, showAllFloors }) {
               <Room
                 key={room.id}
                 room={room}
+                allRooms={floorRooms}
                 allDoors={doors}
                 allWindows={windows}
                 openDoors={openDoors}
