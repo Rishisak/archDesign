@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useDesignStore } from '../store/designStore';
 import { saveUserProject } from '../lib/supabase';
+import FurnishPanel from './FurnishPanel';
 
 const VIEWS = [
   { id: '2d', label: '2D Plan', icon: '⊞' },
@@ -11,6 +12,7 @@ export default function Header({ currentUser, onSignOut, onBackToDashboard }) {
   const [showProfileCard, setShowProfileCard] = useState(false);
   const [showExitModal, setShowExitModal] = useState(false);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState(false);
+  const [showFurnish, setShowFurnish] = useState(false);
 
   const {
     currentProjectId,
@@ -81,6 +83,7 @@ export default function Header({ currentUser, onSignOut, onBackToDashboard }) {
   };
 
   return (
+    <>
     <header style={{
       height: 'var(--header-height)',
       display: 'flex',
@@ -156,6 +159,15 @@ export default function Header({ currentUser, onSignOut, onBackToDashboard }) {
         ))}
       </div>
 
+      {/* Furnish Button */}
+      <button
+        className="furnish-header-btn"
+        onClick={() => setShowFurnish(true)}
+        title="Shop furniture from Amazon India"
+      >
+        <span>Furnish</span>
+      </button>
+
       {/* Spacer */}
       <div style={{ flex: 1 }} />
 
@@ -221,8 +233,6 @@ export default function Header({ currentUser, onSignOut, onBackToDashboard }) {
             <path d="M9.5 4.5L12 7l-2.5 2.5" />
           </svg>
         </button>
-
-        <div className="header-divider" style={{ margin: '0 4px' }} />
 
         <div className="header-divider" style={{ margin: '0 4px' }} />
 
@@ -396,5 +406,9 @@ export default function Header({ currentUser, onSignOut, onBackToDashboard }) {
         </div>
       )}
     </header>
+
+    {/* Furnish Panel */}
+    <FurnishPanel open={showFurnish} onClose={() => setShowFurnish(false)} />
+    </>
   );
 }
