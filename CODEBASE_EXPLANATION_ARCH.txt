@@ -1,0 +1,264 @@
+================================================================================
+           ARCHDESIGN / BLUEPRINT STUDIO - COMPLETE CODEBASE GUIDE
+================================================================================
+
+1. PROJECT OVERVIEW
+--------------------------------------------------------------------------------
+ArchDesign (also known as Blueprint Studio) is a web-based architectural design
+and floor planning application. It allows architects, interior designers, and
+homeowners to:
+  • Draw 2D floor plans with exact measurements, walls, doors, windows, and furniture.
+  • Instantaneously view and interact with a full 3D extruded model with custom PBR
+    materials (parquet hardwood, tiles, stone, paint) and real-time lighting.
+  • Take a first-person (FPS) virtual 3D walkthrough inside the building.
+  • Preview the design in WebVR/XR mode.
+  • Receive AI-assisted design suggestions (e.g., ventilation warning, traffic flow, egress).
+  • Shop real furniture items matched to room dimensions via Amazon India integration.
+  • Multi-floor support (Ground floor, 1st floor, 2nd floor, etc.) with elevation management.
+  • Account authentication & Cloud persistence via Supabase database + local offline cache.
+
+--------------------------------------------------------------------------------
+2. TECH STACK & KEY DEPENDENCIES
+--------------------------------------------------------------------------------
+  • React 19: Modern UI rendering framework with state hooks and Suspense lazy loading.
+  • Vite: Fast build tool and dev server.
+  • Three.js & @react-three/fiber & @react-three/drei: High-performance 3D WebGL graphics.
+  • Zustand (with subscribeWithSelector): Lightweight, centralized state management.
+  • @supabase/supabase-js: Backend-as-a-Service for Authentication and PostgreSQL database.
+  • Lucide React: Icon library for sleek UI components.
+  • GSAP & @studio-freight/lenis (in subproject interior-scroll-site): Smooth scroll animations.
+
+--------------------------------------------------------------------------------
+3. ARCHITECTURE & DATA FLOW
+--------------------------------------------------------------------------------
+  [ User Interface (React) ]
+         │
+         ▼
+  [ Zustand Store (designStore.js) ] ◄── (Undo / Redo History Stack)
+         │
+         ├─► [ 2D Canvas (SVG rendering & interactive dragging) ]
+         ├─► [ 3D Viewer (Three.js WebGL extrusions & PBR textures) ]
+         ├─► [ Walkthrough Viewer (FPS Controls + collision physics) ]
+         └─► [ Supabase API (Cloud Database & Auth Sync) ]
+
+--------------------------------------------------------------------------------
+4. SUPABASE DATABASE & API REQUESTS EXPLAINED
+--------------------------------------------------------------------------------
+The backend is powered by Supabase (PostgreSQL + Auth API).
+Supabase URL: https://jkdjboxmtajkuxxecppo.supabase.co
+
+All database operations and API calls are centralized in `src/lib/supabase.js`:
+
+A. AUTHENTICATION API REQUESTS:
+   1. `signUpWithEmail(email, password, fullName)`:
+      - Sends an HTTP POST request to Supabase Auth API (`supabase.auth.signUp`).
+      - Registers the user with email & password and attaches user metadata (`full_name`).
+      - Fallback: Also stores account details in `localStorage` under `blueprint_registered_accounts`
+        so login works even if internet or Supabase Auth service is offline.
+      - Calls `recordUserSession` after successful signup.
+
+   2. `signInWithEmail(email, password)`:
+      - Sends an HTTP POST request to Supabase Auth API (`supabase.auth.signInWithPassword`).
+      - Validates credentials against Supabase Auth.
+      - Fallback: If network fails or user was registered locally, checks `blueprint_registered_accounts`
+        in `localStorage`.
+      - Calls `recordUserSession` after successful login.
+
+   3. `loginAsGuestSession(customGuestName)`:
+      - Generates a unique guest email (`guest_<timestamp>_<random>@blueprint.studio`) and password.
+      - Calls `supabase.auth.signUp` with `is_guest: true`.
+      - Creates an instant guest session without requiring user input.
+      - Calls `recordUserSession` to store the guest activity.
+
+   4. `recordUserSession(userRecord)`:
+      - Executes an Upsert SQL request to Supabase database table `user_logins`.
+      - Fields updated: `id`, `email`, `full_name`, `role`, `last_login`, `metadata`.
+      - Fallback: If `user_logins` table is missing, upserts to `profiles` table.
+
+B. PROJECT DATA STORAGE & FETCHING API REQUESTS:
+   1. `fetchUserProjects(userOrId)`:
+      - Query: `supabase.from('user_projects').select('*').or('user_id.eq.ID,user_id.eq.EMAIL').order('updated_at', { ascending: false })`
+      - Purpose: Retrieves all saved architectural blueprints belonging to the logged-in user or guest.
+      - Merging: Fetches projects from Supabase DB and merges them with locally cached projects in `localStorage`
+        (`blueprint_user_projects_<userId>`), deduplicating by project `id` and sorting by newest update time.
+
+   2. `saveUserProject(userOrId, project)`:
+      - Query: `supabase.from('user_projects').upsert(payload, { onConflict: 'id' })`
+      - Payload contains:
+        • `id`: Project unique identifier
+        • `user_id`: Owner user ID or email
+        • `name`: Project title (e.g. "Modern Villa")
+        • `data`: JSON stringified snapshot of rooms, grounds, doors, windows, furniture, floors, themes.
+        • `updated_at`: Current ISO timestamp
+      - Local Backup: Simultaneously updates `localStorage` so project is saved offline immediately.
+
+   3. `deleteUserProject(userOrId, projectId)`:
+      - Query: `supabase.from('user_projects').delete().eq('id', projectId)`
+      - Removes the project from Supabase DB and cleans up `localStorage`.
+
+--------------------------------------------------------------------------------
+5. STATE MANAGEMENT & UNDO/REDO ENGINE (src/store/designStore.js)
+--------------------------------------------------------------------------------
+The core of the application state is managed by Zustand in `designStore.js`:
+
+• STATE VARIABLES:
+  - `rooms`: Array of room objects `{ id, name, x, y, width, height, color, floor, type }`.
+  - `grounds`: Array of building footprints `{ id, name, floor, points: [{x,y}, ...] }`.
+  - `doors`: Array of doors attached to room walls `{ id, roomId, wall, position, width, type }`.
+  - `windows`: Array of windows `{ id, roomId, wall, position, width }`.
+  - `windowModes`: Map of window IDs to modes (`'sliding'` or `'casement'`).
+  - `furniture`: Array of furniture pieces `{ id, roomId, type, x, y, width, height, rotation, color, floor }`.
+  - `floors`: Array of floors `{ id, name, height }`. Default: Floor 0 (Ground Floor).
+  - `activeFloor`: Currently active floor ID.
+  - `viewMode`: `'2d'` | `'3d'` | `'walkthrough'` | `'vr'`.
+  - `activeTool`: `'select'` | `'ground'` | `'room'` | `'door'` | `'window'` | `'furniture'`.
+  - `pbrMaterialTheme`: Selected 3D textures (`wallTexture`, `floorTexture`, `exteriorTexture`).
+  - `aiSuggestions`: List of AI architectural feedback items.
+  - `past` / `future`: History arrays holding deep clones of design snapshots for Undo (Ctrl+Z) and Redo (Ctrl+Y).
+
+• MATH & GEOMETRY HELPERS:
+  - `convexHull(points)`: Calculates the outer convex boundary for merging ground footprints.
+  - `pointInPolygon(point, polygon)`: Ray-casting algorithm to test if a room is inside the building footprint.
+  - `rectInsideAnyGround(...)`: Validates that a room stays within valid ground footprints.
+
+--------------------------------------------------------------------------------
+6. FILE-BY-FILE EXPLANATION
+--------------------------------------------------------------------------------
+
+1. `src/main.jsx`
+   - Entry point of the React application.
+   - Renders the root `<App />` component into the DOM element with ID `'root'`, wrapped in React `<StrictMode>`.
+
+2. `src/App.jsx`
+   - Main controller component of the application.
+   - Manages global state transitions between 3 main screens:
+     1) `LoginPage`: Shown if user is not authenticated.
+     2) `Dashboard`: Main hub showing user's saved projects after login.
+     3) `Studio`: Interactive 2D/3D design studio environment.
+   - Contains keyboard listeners for global Undo (`Ctrl+Z`) and Redo (`Ctrl+Y` / `Ctrl+Shift+Z`).
+   - Uses `React.lazy` and `<Suspense>` to load `ThreeDViewer` and `WalkthroughViewer` on demand to optimize performance.
+
+3. `src/index.css`
+   - Complete CSS design system and stylesheet.
+   - Defines CSS variables for dark theme colors, spacing, borders, shadows, and glassmorphism.
+   - Styling for headers, toolbars, side panels, cards, buttons, modals, dropdowns, and custom animations.
+
+4. `src/lib/supabase.js`
+   - Central backend helper library (explained in Section 4 above).
+   - Initializes the Supabase client using project URL and anon publishable key.
+   - Handles sign in, sign up, guest sessions, user activity recording, project saving, project loading, and project deletion.
+
+5. `src/store/designStore.js`
+   - Central Zustand store (explained in Section 5 above).
+   - Stores building elements (rooms, doors, windows, furniture, floors, footprints).
+   - Handles drawing operations, element creation, room merging/extending, undo/redo history, JSON project import/export.
+
+6. `src/components/Header.jsx`
+   - Top header bar displayed in the studio editor.
+   - Features:
+     • "← Dashboard" button with save prompt modal.
+     • Editable project title input field.
+     • View Switcher buttons (2D Plan vs 3D View).
+     • "Furnish" button to open Amazon India furniture shopping panel.
+     • "Save Project" button to push changes to Supabase cloud.
+     • Undo / Redo action buttons.
+     • Load Demo / Clear Canvas buttons.
+     • User profile dropdown showing account details, room count, floor count, and Log Out button.
+
+7. `src/components/Toolbar.jsx`
+   - Left-hand vertical toolbar in 2D mode.
+   - Tools provided:
+     • Select (pointer for moving and selecting elements).
+     • Ground (drawing polygon footprint boundary).
+     • Room (drawing rectangular rooms with floor gates).
+     • Door (placing doors on room walls).
+     • Window (placing windows on room walls).
+     • Furnish (opens popover menu to search and place furniture items from catalog).
+     • Measure tool indicator.
+
+8. `src/components/Canvas2D.jsx`
+   - The primary 2D architectural CAD canvas powered by SVG.
+   - Highlights:
+     • Interactive Pan and Zoom with smooth mouse dragging and scroll wheel zoom.
+     • Drawing new rooms with real-time dimension measurements in meters/feet.
+     • Wall cutouts rendering for doors and windows.
+     • Room wall resizing and extending handles.
+     • Furniture drag-and-drop placement, selection, and rotation.
+     • Ground footprint polygon editing, vertex dragging, and ground merging.
+     • Auto-center canvas on floor plan elements.
+
+9. `src/components/ThreeDViewer.jsx`
+   - 3D WebGL rendering engine powered by Three.js and `@react-three/fiber`.
+   - Highlights:
+     • Extrudes 2D rooms into 3D walls with cutouts for doors and windows.
+     • Applies PBR material textures (Hardwood Parquet, Marble, Stone, Modern Paint) to walls and floors.
+     • Renders 3D furniture models with rotation and positioning matched to 2D layout.
+     • Interactive door opening in 3D when clicked.
+     • OrbitControls allowing full 360° camera rotation, pan, and zoom.
+     • Real-time directional sunlight shadows and ambient lighting.
+
+10. `src/components/MiniThreeDPreview.jsx`
+    - Small picture-in-picture 3D viewport embedded in the right sidebar during 2D editing mode.
+    - Gives real-time 3D visual feedback as you edit the 2D floor plan.
+
+11. `src/components/RightPanel.jsx`
+    - Right sidebar properties inspector.
+    - Contains:
+      • Mini 3D Preview viewport.
+      • Room Properties (Name, Width, Height, Floor Color, Wall Color).
+      • PBR Material Theme Selector (Wall texture, Floor texture, Exterior texture).
+      • AI Design Suggestions Panel with auto-apply actions (e.g. adding missing windows).
+      • Furniture Properties (Width, Height, Rotation, Color).
+      • Full Asset Library tab for selecting furniture and decor.
+
+12. `src/components/BottomPanel.jsx`
+    - Floor management panel at the bottom of the studio screen.
+    - Allows adding new floors (Ground, 1st, 2nd, etc.), switching active floor view, renaming floors, and deleting upper floors.
+
+13. `src/components/FurnishPanel.jsx`
+    - E-commerce furniture modal overlay.
+    - Integrates search and direct purchase links to Amazon India for real furniture matching the blueprint items.
+
+14. `src/components/WalkthroughViewer.jsx`
+    - First-person perspective (FPS) 3D walkthrough experience inside the building.
+    - Controlled via WASD keys / Arrow keys and mouse PointerLockControls.
+    - Includes collision detection so the camera walks inside rooms through doors.
+
+15. `src/components/VRViewer.jsx`
+    - WebVR / WebXR virtual reality preview mode for immersive 360-degree headset view of the 3D floor plan.
+
+16. `src/components/Dashboard.jsx`
+    - User project management hub displayed after login.
+    - Features:
+      • Displaying all saved projects retrieved from Supabase DB & local cache.
+      • Search bar for quick filtering of projects by name.
+      • "Create Project" modal with option to start from Demo Blueprint or Blank Canvas.
+      • "Quick Demo" instant launcher button.
+      • Card actions: Open Studio editor, view room/floor stats, and Delete Project.
+      • User profile menu with logout option.
+
+17. `src/components/LoginPage.jsx`
+    - Authentication screen.
+    - Features:
+      • Tab toggle for "Sign In" vs "Create Account".
+      • Input fields with validation for Email, Password, and Full Name.
+      • "Login as Guest" button for instant 1-click access without filling forms.
+      • SSO OAuth buttons for Google and Apple.
+      • Left-side animated SVG architectural blueprint graphics panel.
+
+18. `interior-scroll-site/` (Subproject)
+    - Standalone promotional landing page for ArchDesign.
+    - Uses `@studio-freight/lenis` for smooth momentum scrolling and `gsap` for scroll-triggered animations.
+
+--------------------------------------------------------------------------------
+7. SUMMARY OF HOW EVERYTHING WORKS TOGETHER
+--------------------------------------------------------------------------------
+1. USER ARRIVAL: User lands on `LoginPage`. They can Sign In, Sign Up, or click "Login as Guest".
+2. AUTHENTICATION: `supabase.js` records the session in Supabase DB (`user_logins` table) and saves token to `localStorage`.
+3. DASHBOARD: User is redirected to `Dashboard`, where `fetchUserProjects()` queries Supabase DB for all saved projects.
+4. LAUNCH STUDIO: User creates or selects a project. `designStore.js` loads the project data into Zustand store.
+5. 2D DESIGN: In `Canvas2D`, user draws ground footprints, walls/rooms, doors, windows, and places furniture from `Toolbar`.
+6. 3D RENDERING: Switching to 3D mode (`ThreeDViewer`) dynamically extrudes the 2D layout into a textured WebGL scene.
+7. PERSISTENCE: Clicking "Save Project" calls `saveUserProject()`, sending an HTTP upsert request to Supabase `user_projects` table.
+
+================================================================================
