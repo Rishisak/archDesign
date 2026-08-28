@@ -3,9 +3,8 @@ import { useDesignStore } from '../store/designStore';
 import { saveUserProject } from '../lib/supabase';
 
 const VIEWS = [
-  { id: '2d',          label: '2D Plan',    icon: '⊞' },
-  { id: '3d',          label: '3D View',    icon: '◈' },
-  { id: 'walkthrough', label: 'Walkthrough', icon: '▶' },
+  { id: '2d', label: '2D Plan', icon: '⊞' },
+  { id: '3d', label: '3D View', icon: '◈' },
 ];
 
 export default function Header({ currentUser, onSignOut, onBackToDashboard }) {
@@ -193,17 +192,6 @@ export default function Header({ currentUser, onSignOut, onBackToDashboard }) {
           <span>Save Project</span>
         </button>
 
-        {/* Save/Export File JSON */}
-        <button
-          className="btn btn-secondary"
-          onClick={exportProjectJSON}
-          title="Export Design as .json file"
-          style={{ gap: 6, fontSize: 12, padding: '5px 10px' }}
-        >
-          <span>📥</span>
-          <span>Export JSON</span>
-        </button>
-
         <div className="header-divider" style={{ margin: '0 4px' }} />
 
         {/* Undo */}
@@ -235,46 +223,6 @@ export default function Header({ currentUser, onSignOut, onBackToDashboard }) {
         </button>
 
         <div className="header-divider" style={{ margin: '0 4px' }} />
-
-        {/* Snap to grid */}
-        <button
-          className={`icon-btn ${snapToGrid ? 'active' : ''}`}
-          onClick={() => setSnapToGrid(!snapToGrid)}
-          title="Snap to Grid"
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <rect x="2" y="2" width="5" height="5" rx="1"/>
-            <rect x="9" y="2" width="5" height="5" rx="1"/>
-            <rect x="2" y="9" width="5" height="5" rx="1"/>
-            <rect x="9" y="9" width="5" height="5" rx="1"/>
-          </svg>
-        </button>
-
-        {/* Right panel toggle */}
-        <button
-          className={`icon-btn ${showRightPanel ? 'active' : ''}`}
-          onClick={toggleRightPanel}
-          title={showRightPanel ? 'Hide right panel' : 'Show right panel'}
-          aria-label="Toggle right panel"
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <rect x="2" y="2" width="12" height="12" rx="1.5"/>
-            <path d="M11 2v12"/>
-          </svg>
-        </button>
-
-        {/* AI Copilot Panel */}
-        <button
-          className={`icon-btn ${showAIPanel ? 'active' : ''}`}
-          onClick={() => setShowAIPanel(!showAIPanel)}
-          title="AI Copilot"
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <circle cx="8" cy="6" r="3"/>
-            <path d="M2 14c0-3 2.7-5 6-5s6 2 6 5"/>
-            <path d="M8 1v1M1 6h1M15 6h-1M3 3l.7.7M13 3l-.7.7"/>
-          </svg>
-        </button>
 
         <div className="header-divider" style={{ margin: '0 4px' }} />
 
